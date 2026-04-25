@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.log
+
+# Editors
+.vscode/
+.idea/
+.DS_Store
+
+# Generated state snapshots (regenerate via the backend exporter)
+data/state.json
+frontend/public/state.json
+
+# Env
+.env
+.env.local
