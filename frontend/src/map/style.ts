@@ -1,33 +1,54 @@
 import type { StyleSpecification } from "maplibre-gl";
 
 /**
- * CARTO dark-matter raster tiles via the public xyz endpoint. Free, no API
- * key, attribution-required. We use raster (rather than vector) to keep the
- * runtime footprint small and avoid a glyphs/sprites dependency for v1.
+ * Esri World Imagery (satellite) + Esri reference overlay (boundaries and
+ * place names). Both are public XYZ raster endpoints, no API key, attribution
+ * required. Raster keeps the runtime footprint small and avoids a
+ * glyphs/sprites dependency for v1.
  */
+const ESRI_ATTRIBUTION =
+  'Imagery &copy; <a href="https://www.esri.com/">Esri</a>, Maxar, Earthstar Geographics, and the GIS User Community';
+
 export const baseStyle: StyleSpecification = {
   version: 8,
   glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
   sources: {
-    "carto-dark": {
+    "esri-imagery": {
       type: "raster",
       tiles: [
-        "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
-        "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
-        "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      attribution: ESRI_ATTRIBUTION,
+    },
+    "esri-reference": {
+      type: "raster",
+      tiles: [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+      attribution: ESRI_ATTRIBUTION,
     },
   },
   layers: [
     { id: "background", type: "background", paint: { "background-color": "#070a0e" } },
     {
-      id: "carto-dark",
+      id: "esri-imagery",
       type: "raster",
-      source: "carto-dark",
-      paint: { "raster-opacity": 0.85, "raster-contrast": 0.05 },
+      source: "esri-imagery",
+      // Slight darken + desaturate so the data overlays remain dominant.
+      paint: {
+        "raster-opacity": 0.4,
+        "raster-saturation": -0.3,
+        "raster-contrast": 0.05,
+        "raster-brightness-max": 0.75,
+      },
+    },
+    {
+      id: "esri-reference",
+      type: "raster",
+      source: "esri-reference",
+      paint: { "raster-opacity": 0.7 },
     },
   ],
 };
