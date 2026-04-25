@@ -35,7 +35,21 @@ npm install
 npm run dev
 ```
 
-`npm run dev` runs a `predev` step that copies `data/state.json` into `frontend/public/state.json`.
+`npm run dev` runs a `predev` step that copies `data/state.json` and `data/intel.json` into `frontend/public/`.
+
+### Live news (optional)
+
+The intel layer can pull from the live GDELT 2.0 DOC API instead of the
+curated/frozen datasets. It is off by default; flip it on with:
+
+```bash
+python -m axis settings live-news on
+python -m axis intel tick --source auto --interval 30   # rewrites intel.json on a loop
+```
+
+Toggle off any time with `python -m axis settings live-news off`. See
+[docs/intel.md](docs/intel.md) for the full settings list and live-source
+behaviour. The frontend polls `intel.json` and is unchanged.
 
 ## Architecture
 

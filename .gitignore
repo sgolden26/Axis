@@ -28,6 +28,9 @@ data/intel.json
 frontend/public/state.json
 frontend/public/intel.json
 
+# Operator-local backend settings (live news toggle, etc.)
+data/backend_settings.json
+
 # Env
 .env
 .env.local
