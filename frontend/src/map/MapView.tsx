@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import maplibregl, { Map as MlMap, MapGeoJSONFeature } from "maplibre-gl";
 import { useAppStore, type LayerKey } from "@/state/store";
 import type { ScenarioSnapshot, Selection } from "@/types/scenario";
+import type { RegionIntel } from "@/types/intel";
 import {
   baseStyle,
   LAYER_CITY_DOT,
@@ -49,9 +50,18 @@ export function MapView() {
   const selectionRef = useRef<Selection>(null);
 
   const scenario = useAppStore((s) => s.scenario);
+  const intel = useAppStore((s) => s.intel);
   const selection = useAppStore((s) => s.selection);
   const visibleLayers = useAppStore((s) => s.visibleLayers);
   const select = useAppStore((s) => s.select);
+
+  const intelByRegion = useMemo(() => {
+    const map = new Map<string, RegionIntel>();
+    if (intel) {
+      for (const r of intel.regions) map.set(r.region_id, r);
+    }
+    return map;
+  }, [intel]);
 
   // initialise map once
   useEffect(() => {
@@ -80,10 +90,10 @@ export function MapView() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !scenario) return;
-    const apply = () => addOrUpdateData(map, scenario);
+    const apply = () => addOrUpdateData(map, scenario, intelByRegion);
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
-  }, [scenario]);
+  }, [scenario, intelByRegion]);
 
   // wire interactions once data is on the map
   useEffect(() => {
@@ -196,9 +206,17 @@ function sourceForKind(kind: NonNullable<Selection>["kind"]): string {
   }
 }
 
-function addOrUpdateData(map: MlMap, scenario: ScenarioSnapshot) {
+function addOrUpdateData(
+  map: MlMap,
+  scenario: ScenarioSnapshot,
+  intelByRegion: Map<string, RegionIntel>,
+) {
   const factionsById = new Map(scenario.factions.map((f) => [f.id, f]));
-  const territories = territoryFeatureCollection(scenario.territories, factionsById);
+  const territories = territoryFeatureCollection(
+    scenario.territories,
+    factionsById,
+    intelByRegion,
+  );
   const cities = cityFeatureCollection(scenario.cities, factionsById);
   const units = unitFeatureCollection(scenario.units, factionsById);
 

@@ -1,7 +1,21 @@
+import { useEffect, useState } from "react";
 import { useAppStore } from "@/state/store";
 
 export function HUD() {
   const scenario = useAppStore((s) => s.scenario);
+  const intel = useAppStore((s) => s.intel);
+  const lastIntelLoadAt = useAppStore((s) => s.lastIntelLoadAt);
+  const intelError = useAppStore((s) => s.intelError);
+
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const ago = lastIntelLoadAt
+    ? Math.max(0, Math.round((now - lastIntelLoadAt) / 1000))
+    : null;
 
   return (
     <header className="hairline-b relative flex h-12 shrink-0 items-stretch bg-ink-800">
@@ -26,12 +40,47 @@ export function HUD() {
       </div>
 
       <div className="hairline-l flex items-center gap-4 px-4 font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
-        <span>v0.1.0</span>
+        <IntelTickBadge
+          source={intel?.source ?? null}
+          tickSeq={intel?.tick_seq ?? null}
+          ago={ago}
+          error={intelError}
+        />
         <span className="text-ink-300">·</span>
-        <span className="text-accent-ok">live</span>
+        <span>v{__schemaSummary(scenario?.schema_version, intel?.intel_schema_version)}</span>
       </div>
     </header>
   );
+}
+
+function IntelTickBadge({
+  source,
+  tickSeq,
+  ago,
+  error,
+}: {
+  source: string | null;
+  tickSeq: number | null;
+  ago: number | null;
+  error: string | null;
+}) {
+  if (error) {
+    return <span className="text-accent-danger">intel · offline</span>;
+  }
+  if (ago == null) {
+    return <span className="text-ink-200">intel · warming up</span>;
+  }
+  const tone = ago > 10 ? "text-accent-amber" : "text-accent-ok";
+  return (
+    <span className={tone}>
+      intel · {source ?? "?"}
+      {tickSeq != null && tickSeq > 0 ? ` #${tickSeq}` : ""} · {ago}s
+    </span>
+  );
+}
+
+function __schemaSummary(state: string | undefined, intel: string | undefined): string {
+  return `${state ?? "?"}/${intel ?? "?"}`;
 }
 
 function Logo() {

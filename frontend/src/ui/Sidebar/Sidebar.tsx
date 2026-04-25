@@ -11,7 +11,7 @@ export function Sidebar() {
 
   if (!scenario) {
     return (
-      <aside className="hairline-l flex h-full w-[360px] flex-col bg-ink-800">
+      <aside className="hairline-l hidden h-full w-[320px] shrink-0 flex-col bg-ink-800 xl:flex">
         <EmptyState />
       </aside>
     );
@@ -46,7 +46,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="hairline-l flex h-full w-[360px] flex-col bg-ink-800">
+    <aside className="hairline-l hidden h-full w-[320px] shrink-0 flex-col bg-ink-800 xl:flex">
       <div className="hairline-b flex items-center justify-between px-4 py-2">
         <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
           contact // {title}

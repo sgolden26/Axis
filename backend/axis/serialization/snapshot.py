@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from axis import SCHEMA_VERSION
+from axis.decision.actions import DEFAULT_ACTIONS, Action, action_catalog_to_dict
 from axis.domain.city import City
 from axis.domain.faction import Faction
 from axis.domain.territory import Territory
@@ -17,8 +18,14 @@ from axis.units.base import Unit
 class SnapshotExporter:
     """Convert a `Theater` into a JSON-serialisable dict matching the schema."""
 
-    def __init__(self, theater: Theater) -> None:
+    def __init__(
+        self,
+        theater: Theater,
+        *,
+        actions: tuple[Action, ...] = DEFAULT_ACTIONS,
+    ) -> None:
         self._theater = theater
+        self._actions = actions
 
     def to_dict(self) -> dict[str, Any]:
         t = self._theater
@@ -35,6 +42,7 @@ class SnapshotExporter:
             "cities": [self._city(c) for c in t.cities],
             "territories": [self._territory(p) for p in t.territories],
             "units": [self._unit(u) for u in t.units],
+            "actions": action_catalog_to_dict(self._actions),
         }
 
     def write(self, path: Path | str, *, indent: int = 2) -> Path:

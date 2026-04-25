@@ -7,11 +7,15 @@ Single source of truth for the FE/BE contract. Mirrored by:
 
 The backend produces `data/state.json`; the frontend reads `public/state.json`. Bump `schema_version` on any breaking change and update both mirrors in the same PR.
 
+The dynamic morale / event signal layer is split into a separate
+`data/intel.json` (see [intel.md](./intel.md)) so it can be refreshed
+independently of the static world.
+
 ## Top level
 
 ```jsonc
 {
-  "schema_version": "0.1.0",
+  "schema_version": "0.2.0",
   "scenario": {
     "id": "eastern_europe",
     "name": "Suwalki Gap",
@@ -22,7 +26,8 @@ The backend produces `data/state.json`; the frontend reads `public/state.json`. 
   "factions": [Faction, ...],
   "cities": [City, ...],
   "territories": [Territory, ...],
-  "units": [Unit, ...]
+  "units": [Unit, ...],
+  "actions": [Action, ...]
 }
 ```
 
@@ -80,6 +85,31 @@ The backend produces `data/state.json`; the frontend reads `public/state.json`. 
   "callsign": "IRON-1"
 }
 ```
+
+## Action
+
+```jsonc
+{
+  "id": "deploy_troops",
+  "name": "Deploy Troops",
+  "description": "Move kinetic forces into the region.",
+  "base_rate": 0.65,         // baseline P(success), 0..1
+  "morale_weight": 0.30,      // signed multiplier on (morale-50)/50
+  "trend_weight": 0.10,       // signed multiplier on trend (-1|0|+1)
+  "severity_weight": 0.20,    // signed multiplier on net recent-event severity (-1..+1)
+  "category_sensitivities": { // signed; how each category nudges this action
+    "protest": -0.15,
+    "military_loss": -0.20,
+    "economic_stress": -0.05,
+    "political_instability": -0.10,
+    "nationalist_sentiment": 0.10
+  }
+}
+```
+
+The action catalogue is part of the static world. The decision evaluator combines
+these weights with the per-region intel to produce a probability and a
+breakdown. See [decision-engine.md](./decision-engine.md) for the formula.
 
 ## Conventions
 

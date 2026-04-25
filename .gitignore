@@ -24,7 +24,9 @@ frontend/.vite/
 
 # Generated state snapshots (regenerate via the backend exporter)
 data/state.json
+data/intel.json
 frontend/public/state.json
+frontend/public/intel.json
 
 # Env
 .env

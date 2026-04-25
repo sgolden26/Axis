@@ -1,14 +1,19 @@
 import { useEffect } from "react";
 import { useAppStore } from "@/state/store";
 import { loadScenario } from "@/api/loadScenario";
+import { loadIntel } from "@/api/loadIntel";
 import { HUD } from "@/ui/HUD";
 import { CommandRail } from "@/ui/CommandRail";
 import { Sidebar } from "@/ui/Sidebar/Sidebar";
 import { MapView } from "@/map/MapView";
+import { DecisionEngine } from "@/ui/DecisionEngine/DecisionEngine";
 
 export function App() {
   const setScenario = useAppStore((s) => s.setScenario);
   const setLoadError = useAppStore((s) => s.setLoadError);
+  const setIntel = useAppStore((s) => s.setIntel);
+  const setIntelError = useAppStore((s) => s.setIntelError);
+  const intelTickIntervalMs = useAppStore((s) => s.intelTickIntervalMs);
   const loadError = useAppStore((s) => s.loadError);
   const scenario = useAppStore((s) => s.scenario);
 
@@ -17,6 +22,28 @@ export function App() {
       .then(setScenario)
       .catch((err: Error) => setLoadError(err.message));
   }, [setScenario, setLoadError]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const tick = async () => {
+      try {
+        const snap = await loadIntel();
+        if (!cancelled) setIntel(snap);
+      } catch (err) {
+        if (!cancelled) {
+          setIntelError(err instanceof Error ? err.message : String(err));
+        }
+      }
+    };
+
+    void tick();
+    const id = window.setInterval(tick, intelTickIntervalMs);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [setIntel, setIntelError, intelTickIntervalMs]);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-ink-900 text-ink-50">
@@ -29,6 +56,7 @@ export function App() {
           {loadError && <ErrorOverlay message={loadError} />}
         </main>
         <Sidebar />
+        <DecisionEngine />
       </div>
     </div>
   );

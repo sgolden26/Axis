@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { actionSchema } from "./decision";
 
 export const allegianceSchema = z.enum(["blue", "red", "neutral"]);
 export type Allegiance = z.infer<typeof allegianceSchema>;
@@ -79,6 +80,7 @@ export const scenarioSnapshotSchema = z.object({
   cities: z.array(citySchema),
   territories: z.array(territorySchema),
   units: z.array(unitSchema),
+  actions: z.array(actionSchema).default([]),
 });
 export type ScenarioSnapshot = z.infer<typeof scenarioSnapshotSchema>;
 
