@@ -4,7 +4,7 @@ A modular wargaming platform combining tactical simulation (troop movement, kine
 
 ## Status
 
-v1: frontend shell with MapLibre theatre map, Python OOP scenario builder, JSON snapshot pipeline. Simulation engine and news/intel integration are stubbed for follow-up PRs.
+v1: frontend shell with MapLibre theatre map, Python OOP scenario builder, JSON snapshot pipeline, and deeply-modelled country dossiers (government, military, nuclear posture, demographics, diplomacy, energy/logistics, public opinion, geography) wired into the FE as a tabbed dossier panel, choropleth map overlay and roster. Simulation engine and news/intel integration are stubbed for follow-up PRs.
 
 ## Repo layout
 

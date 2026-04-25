@@ -7,6 +7,8 @@ import { CommandRail } from "@/ui/CommandRail";
 import { Sidebar } from "@/ui/Sidebar/Sidebar";
 import { MapView } from "@/map/MapView";
 import { DecisionEngine } from "@/ui/DecisionEngine/DecisionEngine";
+import { CountryRoster } from "@/ui/CountryRoster";
+import { ChoroplethLegend } from "@/ui/ChoroplethLegend";
 
 export function App() {
   const setScenario = useAppStore((s) => s.setScenario);
@@ -52,6 +54,8 @@ export function App() {
         <CommandRail />
         <main className="relative flex-1 overflow-hidden">
           <MapView />
+          <ChoroplethLegend />
+          <CountryRoster />
           {!scenario && !loadError && <LoadingOverlay />}
           {loadError && <ErrorOverlay message={loadError} />}
         </main>

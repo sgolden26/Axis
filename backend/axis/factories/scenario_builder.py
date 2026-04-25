@@ -7,6 +7,7 @@ from typing import Self
 
 from axis.domain.city import City, CityImportance
 from axis.domain.coordinates import BoundingBox, Coordinate
+from axis.domain.country import Country
 from axis.domain.faction import Allegiance, Faction
 from axis.domain.territory import Territory
 from axis.domain.theater import Theater
@@ -35,6 +36,7 @@ class ScenarioBuilder:
         self._clock: datetime = datetime.now(tz=timezone.utc)
         self._bbox: BoundingBox | None = None
         self._factions: list[Faction] = []
+        self._countries: list[Country] = []
         self._cities: list[City] = []
         self._territories: list[Territory] = []
         self._units: list[Unit] = []
@@ -61,6 +63,11 @@ class ScenarioBuilder:
         self._factions.append(Faction(id=id, name=name, allegiance=allegiance, color=color))
         return self
 
+    def add_country(self, country: Country) -> Self:
+        """Attach a fully-built `Country` (typically pulled from a repository)."""
+        self._countries.append(country)
+        return self
+
     def add_city(
         self,
         id: str,
@@ -71,6 +78,7 @@ class ScenarioBuilder:
         population: int,
         importance: str | CityImportance,
         infrastructure: tuple[str, ...] = (),
+        country_id: str | None = None,
     ) -> Self:
         imp = importance if isinstance(importance, CityImportance) else CityImportance(importance)
         self._cities.append(
@@ -82,6 +90,7 @@ class ScenarioBuilder:
                 population=population,
                 importance=imp,
                 infrastructure=tuple(infrastructure),
+                country_id=country_id,
             )
         )
         return self
@@ -93,6 +102,7 @@ class ScenarioBuilder:
         faction_id: str,
         ring: list[tuple[float, float]],
         control: float = 1.0,
+        country_id: str | None = None,
     ) -> Self:
         coords = tuple(Coordinate(lon=lon, lat=lat) for lon, lat in ring)
         self._territories.append(
@@ -102,6 +112,7 @@ class ScenarioBuilder:
                 faction_id=faction_id,
                 polygon=(coords,),
                 control=control,
+                country_id=country_id,
             )
         )
         return self
@@ -120,6 +131,8 @@ class ScenarioBuilder:
         morale: float = 1.0,
         echelon: str | None = None,
         callsign: str = "",
+        country_id: str | None = None,
+        available_actions: tuple[str, ...] = (),
     ) -> Self:
         unit = UnitFactory.create(
             kind=kind,
@@ -132,6 +145,8 @@ class ScenarioBuilder:
             morale=morale,
             echelon=echelon,
             callsign=callsign,
+            country_id=country_id,
+            available_actions=available_actions,
         )
         self._units.append(unit)
         return self
@@ -146,6 +161,7 @@ class ScenarioBuilder:
             clock=self._clock,
             bbox=self._bbox,
             factions=list(self._factions),
+            countries=list(self._countries),
             cities=list(self._cities),
             territories=list(self._territories),
             units=list(self._units),

@@ -23,6 +23,7 @@ class City:
     population: int
     importance: CityImportance
     infrastructure: tuple[str, ...] = field(default_factory=tuple)
+    country_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.population < 0:

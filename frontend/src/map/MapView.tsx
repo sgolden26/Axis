@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import maplibregl, { Map as MlMap, MapGeoJSONFeature } from "maplibre-gl";
 import { useAppStore, type LayerKey } from "@/state/store";
 import type { ScenarioSnapshot, Selection } from "@/types/scenario";
+import type { Country } from "@/types/country";
 import type { RegionIntel } from "@/types/intel";
 import {
   baseStyle,
@@ -20,6 +21,7 @@ import {
   territoryFeatureCollection,
   territoryFillLayer,
   territoryLineLayer,
+  type ChoroplethResolver,
 } from "./layers/territoryLayer";
 import {
   cityDotLayer,
@@ -32,6 +34,14 @@ import {
   unitFeatureCollection,
   unitHaloLayer,
 } from "./layers/unitLayer";
+import {
+  baseDotLayer,
+  baseFeatureCollection,
+  baseLabelLayer,
+  LAYER_COUNTRY_BASE_DOT,
+  LAYER_COUNTRY_BASE_LABEL,
+  SOURCE_COUNTRY_BASES,
+} from "./layers/baseLayer";
 
 const CLICKABLE_LAYERS = [
   LAYER_UNIT_DOT,
@@ -53,6 +63,7 @@ export function MapView() {
   const intel = useAppStore((s) => s.intel);
   const selection = useAppStore((s) => s.selection);
   const visibleLayers = useAppStore((s) => s.visibleLayers);
+  const choroplethMetric = useAppStore((s) => s.choroplethMetric);
   const select = useAppStore((s) => s.select);
 
   const intelByRegion = useMemo(() => {
@@ -62,6 +73,14 @@ export function MapView() {
     }
     return map;
   }, [intel]);
+
+  const countryById = useMemo(() => {
+    const m = new Map<string, Country>();
+    for (const c of scenario?.countries ?? []) m.set(c.id, c);
+    return m;
+  }, [scenario]);
+
+  const choroplethOn = visibleLayers.country_choropleth;
 
   // initialise map once
   useEffect(() => {
@@ -90,10 +109,15 @@ export function MapView() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !scenario) return;
-    const apply = () => addOrUpdateData(map, scenario, intelByRegion);
+    const choro: ChoroplethResolver = {
+      enabled: choroplethOn,
+      metric: choroplethMetric,
+      countryById,
+    };
+    const apply = () => addOrUpdateData(map, scenario, intelByRegion, choro);
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
-  }, [scenario, intelByRegion]);
+  }, [scenario, intelByRegion, choroplethOn, choroplethMetric, countryById]);
 
   // wire interactions once data is on the map
   useEffect(() => {
@@ -174,11 +198,11 @@ export function MapView() {
     const prev = selectionRef.current;
     if (prev) {
       const src = sourceForKind(prev.kind);
-      map.setFeatureState({ source: src, id: prev.id }, { selected: false });
+      if (src) map.setFeatureState({ source: src, id: prev.id }, { selected: false });
     }
     if (selection) {
       const src = sourceForKind(selection.kind);
-      map.setFeatureState({ source: src, id: selection.id }, { selected: true });
+      if (src) map.setFeatureState({ source: src, id: selection.id }, { selected: true });
     }
     selectionRef.current = selection;
   }, [selection, scenario]);
@@ -195,7 +219,7 @@ export function MapView() {
   return <div ref={containerRef} className="absolute inset-0" />;
 }
 
-function sourceForKind(kind: NonNullable<Selection>["kind"]): string {
+function sourceForKind(kind: NonNullable<Selection>["kind"]): string | null {
   switch (kind) {
     case "city":
       return SOURCE_CITIES;
@@ -203,6 +227,8 @@ function sourceForKind(kind: NonNullable<Selection>["kind"]): string {
       return SOURCE_UNITS;
     case "territory":
       return SOURCE_TERRITORIES;
+    case "country":
+      return null;
   }
 }
 
@@ -210,19 +236,23 @@ function addOrUpdateData(
   map: MlMap,
   scenario: ScenarioSnapshot,
   intelByRegion: Map<string, RegionIntel>,
+  choro: ChoroplethResolver,
 ) {
   const factionsById = new Map(scenario.factions.map((f) => [f.id, f]));
   const territories = territoryFeatureCollection(
     scenario.territories,
     factionsById,
     intelByRegion,
+    choro,
   );
   const cities = cityFeatureCollection(scenario.cities, factionsById);
   const units = unitFeatureCollection(scenario.units, factionsById);
+  const bases = baseFeatureCollection(scenario.countries, factionsById);
 
   upsertGeoJsonSource(map, SOURCE_TERRITORIES, withStringIds(territories));
   upsertGeoJsonSource(map, SOURCE_CITIES, withStringIds(cities));
   upsertGeoJsonSource(map, SOURCE_UNITS, withStringIds(units));
+  upsertGeoJsonSource(map, SOURCE_COUNTRY_BASES, withStringIds(bases));
 
   if (!map.getLayer(territoryFillLayer.id)) map.addLayer(territoryFillLayer);
   if (!map.getLayer(territoryLineLayer.id)) map.addLayer(territoryLineLayer);
@@ -231,6 +261,8 @@ function addOrUpdateData(
   if (!map.getLayer(cityLabelLayer.id)) map.addLayer(cityLabelLayer);
   if (!map.getLayer(unitHaloLayer.id)) map.addLayer(unitHaloLayer);
   if (!map.getLayer(unitDotLayer.id)) map.addLayer(unitDotLayer);
+  if (!map.getLayer(baseDotLayer.id)) map.addLayer(baseDotLayer);
+  if (!map.getLayer(baseLabelLayer.id)) map.addLayer(baseLabelLayer);
 }
 
 function upsertGeoJsonSource(
@@ -265,6 +297,8 @@ function applyLayerVisibility(map: MlMap, vis: Record<LayerKey, boolean>) {
   set(LAYER_CITY_HALO, vis.cities);
   set(LAYER_CITY_DOT, vis.cities);
   set(LAYER_CITY_LABEL, vis.cities);
+  set(LAYER_COUNTRY_BASE_DOT, vis.country_bases);
+  set(LAYER_COUNTRY_BASE_LABEL, vis.country_bases);
 
   // Units are filtered by domain via the toggles. We use a shared filter on
   // both unit layers; rebuilding it on toggle keeps things simple.

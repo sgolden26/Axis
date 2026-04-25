@@ -10,16 +10,17 @@ Axis is a hackathon entry for the SCSP Hackathon 2026 wargaming track. The aim i
 
 ## Repo map
 
-- `backend/axis/domain/` immutable domain models (`Faction`, `City`, `Territory`, `Theater`, `Coordinate`).
+- `backend/axis/domain/` immutable domain models (`Faction`, `Country` + nested dimension dataclasses, `City`, `Territory`, `Theater`, `Coordinate`).
+- `backend/axis/domain/countries/` `CountryRepository` ABC plus `StubCountryRepository` (hand-authored dossiers); plug-in point for future GDELT/Factbook/IISS adapters.
 - `backend/axis/units/` `Unit` ABC plus `InfantryBrigade`, `ArmouredBrigade`, `AirWing`, `NavalTaskGroup`.
 - `backend/axis/factories/` `UnitFactory` (factory method) and `ScenarioBuilder` (fluent builder).
 - `backend/axis/scenarios/` concrete scenario seeds; v1 only ships `eastern_europe` (Suwalki gap).
 - `backend/axis/serialization/` `SnapshotExporter` (Theater -> JSON).
 - `backend/axis/sim/`, `backend/axis/intel/`, `backend/axis/ai/` placeholder packages reserved for the simulation engine, GDELT/ACLED scraping plus sentiment/morale, and LLM red-cell/adjudicator agents respectively.
 - `frontend/src/map/` MapLibre wrapper + per-feature layers (territory, cities, units).
-- `frontend/src/ui/` HUD, CommandRail, Sidebar with `CityDetail` / `UnitDetail` / `TerritoryDetail`.
-- `frontend/src/state/store.ts` Zustand store (selection + visible layers).
-- `frontend/src/types/scenario.ts` Zod schemas mirroring the Python models.
+- `frontend/src/ui/` HUD, CommandRail, CountryRoster, Sidebar with `CityDetail` / `UnitDetail` / `TerritoryDetail` / `CountryDetail`.
+- `frontend/src/state/store.ts` Zustand store (selection + visible layers + choropleth overlay state).
+- `frontend/src/types/scenario.ts` + `country.ts` Zod schemas mirroring the Python models.
 
 ## Status
 
@@ -28,11 +29,13 @@ v1 scope: frontend shell with selectable map entities, backend OOP scaffolding, 
 ## Conventions
 
 - Coordinates are always `[lon, lat]` (GeoJSON / MapLibre order).
-- Normalised metrics (`strength`, `readiness`, `morale`, `control`) are floats in `[0, 1]`.
-- IDs are namespaced and stable: `city.*`, `unit.<faction>.*`, `terr.*`.
+- Normalised metrics (`strength`, `readiness`, `morale`, `control`, country dimension scalars) are floats in `[0, 1]`. Bilateral relation scores are signed in `[-1, +1]`.
+- IDs are namespaced and stable: `city.*`, `unit.<faction>.*`, `terr.*`. Country ids are short ISO-style slugs (`lt`, `by`).
+- `country_id` on `City`, `Territory`, `Unit` is optional. Alliance-only entities omit it.
+- `available_actions` on `Unit` and `Country` is a list of affordance ids; v1 renders them as disabled buttons.
 - The frontend must ignore unknown fields in `state.json` for forward compatibility.
 - Bump `schema_version` in both Python and Zod mirrors in the same change for any breaking schema edit.
-- Domain code never imports from `sim`/`intel`/`ai`; the dependency graph is one-way.
+- Domain code never imports from `sim`/`intel`/`ai`; the dependency graph is one-way. Country data flows from a `CountryRepository` so adapters can swap without touching scenarios.
 
 ## Upkeep this file
 If making changes to the codebase that changes anything in this file, please update it

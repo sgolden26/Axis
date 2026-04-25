@@ -1,8 +1,16 @@
 import { create } from "zustand";
 import type { ScenarioSnapshot, Selection } from "@/types/scenario";
+import type { ChoroplethMetric } from "@/types/country";
 import type { IntelSnapshot, RegionIntel } from "@/types/intel";
 
-export type LayerKey = "territory" | "cities" | "units_ground" | "units_air" | "units_naval";
+export type LayerKey =
+  | "territory"
+  | "cities"
+  | "units_ground"
+  | "units_air"
+  | "units_naval"
+  | "country_choropleth"
+  | "country_bases";
 
 export const ALL_LAYERS: LayerKey[] = [
   "territory",
@@ -10,6 +18,8 @@ export const ALL_LAYERS: LayerKey[] = [
   "units_ground",
   "units_air",
   "units_naval",
+  "country_choropleth",
+  "country_bases",
 ];
 
 interface AppState {
@@ -25,6 +35,10 @@ interface AppState {
   visibleLayers: Record<LayerKey, boolean>;
   selectedActionId: string | null;
 
+  choroplethMetric: ChoroplethMetric;
+  rosterOpen: boolean;
+  rosterCompareIds: string[];
+
   setScenario: (s: ScenarioSnapshot) => void;
   setLoadError: (e: string | null) => void;
   setIntel: (snapshot: IntelSnapshot) => void;
@@ -33,6 +47,10 @@ interface AppState {
   clearSelection: () => void;
   toggleLayer: (k: LayerKey) => void;
   selectAction: (id: string | null) => void;
+  setChoroplethMetric: (m: ChoroplethMetric) => void;
+  setRosterOpen: (open: boolean) => void;
+  toggleRosterCompare: (countryId: string) => void;
+  clearRosterCompare: () => void;
   intelByRegion: () => Map<string, RegionIntel>;
 }
 
@@ -52,8 +70,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     units_ground: true,
     units_air: true,
     units_naval: true,
+    country_choropleth: false,
+    country_bases: false,
   },
   selectedActionId: null,
+
+  choroplethMetric: "war_support",
+  rosterOpen: false,
+  rosterCompareIds: [],
 
   setScenario: (s) =>
     set((state) => ({
@@ -72,6 +96,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       visibleLayers: { ...state.visibleLayers, [k]: !state.visibleLayers[k] },
     })),
   selectAction: (id) => set({ selectedActionId: id }),
+  setChoroplethMetric: (m) => set({ choroplethMetric: m }),
+  setRosterOpen: (open) => set({ rosterOpen: open }),
+  toggleRosterCompare: (countryId) =>
+    set((state) => {
+      const has = state.rosterCompareIds.includes(countryId);
+      if (has) {
+        return {
+          rosterCompareIds: state.rosterCompareIds.filter((c) => c !== countryId),
+        };
+      }
+      if (state.rosterCompareIds.length >= 4) return state;
+      return { rosterCompareIds: [...state.rosterCompareIds, countryId] };
+    }),
+  clearRosterCompare: () => set({ rosterCompareIds: [] }),
   intelByRegion: () => {
     const intel = get().intel;
     const out = new Map<string, RegionIntel>();

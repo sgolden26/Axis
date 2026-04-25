@@ -14,6 +14,7 @@ class Territory:
     faction_id: str
     polygon: tuple[tuple[Coordinate, ...], ...]  # one or more linear rings, first is outer
     control: float  # 0..1 share of effective control by faction_id
+    country_id: str | None = None
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.control <= 1.0:

@@ -46,11 +46,14 @@ class UnitFactory:
         morale: float = 1.0,
         echelon: str | None = None,
         callsign: str = "",
+        country_id: str | None = None,
+        available_actions: tuple[str, ...] = (),
         metadata: dict[str, object] | None = None,
     ) -> Unit:
         if kind not in cls._registry:
             raise ValueError(f"No unit class registered for kind={kind!r}")
         unit_cls = cls._registry[kind]
+        actions = available_actions or cls._default_actions(kind)
         return unit_cls(
             id=id,
             name=name,
@@ -61,6 +64,8 @@ class UnitFactory:
             morale=morale,
             echelon=echelon if echelon is not None else cls._default_echelon(kind),
             callsign=callsign,
+            country_id=country_id,
+            available_actions=tuple(actions),
             metadata=dict(metadata) if metadata else {},
         )
 
@@ -71,4 +76,40 @@ class UnitFactory:
             UnitKind.ARMOURED_BRIGADE: "brigade",
             UnitKind.AIR_WING: "wing",
             UnitKind.NAVAL_TASK_GROUP: "task_group",
+        }[kind]
+
+    @staticmethod
+    def _default_actions(kind: UnitKind) -> tuple[str, ...]:
+        """Action affordances exposed in the FE; execution is stubbed in v1."""
+        return {
+            UnitKind.INFANTRY_BRIGADE: (
+                "advance",
+                "dig_in",
+                "withdraw",
+                "engage",
+                "screen",
+                "reconnoiter",
+            ),
+            UnitKind.ARMOURED_BRIGADE: (
+                "advance",
+                "exploit",
+                "counter_attack",
+                "withdraw",
+                "engage",
+                "leaguer",
+            ),
+            UnitKind.AIR_WING: (
+                "intercept",
+                "strike",
+                "combat_air_patrol",
+                "suppress_air_defence",
+                "reconnoiter",
+            ),
+            UnitKind.NAVAL_TASK_GROUP: (
+                "patrol",
+                "blockade",
+                "strike",
+                "escort",
+                "anti_submarine_patrol",
+            ),
         }[kind]

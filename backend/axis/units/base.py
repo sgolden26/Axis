@@ -37,6 +37,8 @@ class Unit(ABC):
     morale: float = 1.0  # cohesion / will to fight; driven by intel layer later
     echelon: str = "brigade"
     callsign: str = ""
+    country_id: str | None = None
+    available_actions: tuple[str, ...] = field(default_factory=tuple)
     metadata: dict[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from axis.domain.countries import StubCountryRepository
 from axis.domain.faction import Allegiance
 from axis.domain.theater import Theater
 from axis.factories.scenario_builder import ScenarioBuilder
@@ -29,9 +30,16 @@ def build() -> Theater:
     )
 
     _add_cities(builder)
+    _add_countries(builder)
     _add_territories(builder)
     _add_units(builder)
     return builder.build()
+
+
+def _add_countries(b: ScenarioBuilder) -> None:
+    repo = StubCountryRepository()
+    for country_id in repo.list_ids():
+        b.add_country(repo.get(country_id))
 
 
 def _add_cities(b: ScenarioBuilder) -> None:
@@ -39,11 +47,13 @@ def _add_cities(b: ScenarioBuilder) -> None:
         "city.vilnius", "Vilnius", "nato",
         25.2797, 54.6872, 588_000, "capital",
         infrastructure=("rail_hub", "air_base"),
+        country_id="lt",
     )
     b.add_city(
         "city.kaunas", "Kaunas", "nato",
         23.9036, 54.8985, 295_000, "major",
         infrastructure=("air_base",),
+        country_id="lt",
     )
     b.add_city(
         "city.warsaw", "Warsaw", "nato",
@@ -64,11 +74,13 @@ def _add_cities(b: ScenarioBuilder) -> None:
         "city.minsk", "Minsk", "ru",
         27.5615, 53.9045, 2_010_000, "capital",
         infrastructure=("rail_hub", "air_base", "command_node"),
+        country_id="by",
     )
     b.add_city(
         "city.grodno", "Grodno", "ru",
         23.8345, 53.6884, 357_000, "minor",
         infrastructure=("rail_hub",),
+        country_id="by",
     )
 
 
@@ -83,6 +95,7 @@ def _add_territories(b: ScenarioBuilder) -> None:
             (21.05, 56.45),
         ],
         control=0.95,
+        country_id="lt",
     )
     b.add_territory(
         "terr.poland_ne", "Poland (NE)", "nato",
@@ -110,6 +123,7 @@ def _add_territories(b: ScenarioBuilder) -> None:
             (23.50, 54.05),
         ],
         control=0.96,
+        country_id="by",
     )
 
 
@@ -126,6 +140,7 @@ def _add_units(b: ScenarioBuilder) -> None:
         id="unit.nato.inf-2", name="2nd Inf Bde (LT)", faction_id="nato",
         lon=23.95, lat=54.85, strength=0.88, readiness=0.74, morale=0.83,
         callsign="HUSAR-2",
+        country_id="lt",
     )
     b.add_unit(
         kind=UnitKind.INFANTRY_BRIGADE,
@@ -158,12 +173,14 @@ def _add_units(b: ScenarioBuilder) -> None:
         id="unit.ru.inf-1", name="79th Motor Rifle Bde", faction_id="ru",
         lon=23.95, lat=53.70, strength=0.85, readiness=0.70, morale=0.65,
         callsign="VOLK",
+        country_id="by",
     )
     b.add_unit(
         kind=UnitKind.INFANTRY_BRIGADE,
         id="unit.ru.inf-2", name="6th Sep Motor Rifle Bde", faction_id="ru",
         lon=27.30, lat=53.80, strength=0.82, readiness=0.68, morale=0.66,
         callsign="MEDVED",
+        country_id="by",
     )
     b.add_unit(
         kind=UnitKind.AIR_WING,

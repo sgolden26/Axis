@@ -15,7 +15,7 @@ independently of the static world.
 
 ```jsonc
 {
-  "schema_version": "0.2.0",
+  "schema_version": "0.3.0",
   "scenario": {
     "id": "eastern_europe",
     "name": "Suwalki Gap",
@@ -24,6 +24,7 @@ independently of the static world.
     "bbox": [18.0, 52.0, 28.0, 56.5]   // [minLon, minLat, maxLon, maxLat]
   },
   "factions": [Faction, ...],
+  "countries": [Country, ...],
   "cities": [City, ...],
   "territories": [Territory, ...],
   "units": [Unit, ...],
@@ -42,6 +43,101 @@ independently of the static world.
 }
 ```
 
+## Country
+
+A sovereign state with deep nested attributes. Belongs to exactly one
+`faction` (alliance/coalition layer). All metric scalars are floats in `[0, 1]`
+unless noted.
+
+```jsonc
+{
+  "id": "lt",
+  "iso_a2": "LT",
+  "iso_a3": "LTU",
+  "name": "Lithuania",
+  "official_name": "Republic of Lithuania",
+  "faction_id": "nato",
+  "flag_emoji": "🇱🇹",
+  "capital_city_id": "city.vilnius",
+  "government": {
+    "regime_type": "liberal_democracy",   // liberal_democracy | illiberal_democracy | hybrid | authoritarian | military_junta
+    "head_of_state": "President (stub)",
+    "head_of_government": "Prime Minister (stub)",
+    "cabinet": [{ "title": "Defence Minister", "name": "(stub)" }],
+    "approval_rating": 0.46,               // 0..1
+    "stability_index": 0.78,               // 0..1
+    "last_election": "2024-10-13",
+    "next_election": "2028-10"
+  },
+  "military": {
+    "active_personnel": 23000,
+    "reserve_personnel": 104000,
+    "paramilitary": 14500,
+    "branches": [
+      {
+        "name": "Lithuanian Land Force",
+        "personnel": 14500,
+        "inventory": [
+          { "category": "ifv", "label": "Boxer (Vilkas)", "count": 88, "status": "operational" }
+        ]
+      }
+    ],
+    "doctrine": "Total defence; deny rapid fait accompli...",
+    "posture": "defensive",                // defensive | deterrent | offensive | expeditionary
+    "alert_level": 4,                       // 1..5
+    "c2_nodes": ["Vilnius MOD"]
+  },
+  "nuclear": {
+    "status": "umbrella_host",             // nws | umbrella_host | latent | none
+    "warheads": 0,
+    "delivery_systems": [],
+    "declared_posture": "Non-nuclear; relies on NATO extended deterrence.",
+    "nfu": null                              // bool | null
+  },
+  "demographics": {
+    "population": 2790000,
+    "median_age": 44.8,
+    "urbanisation": 0.68,
+    "ethnic_groups": [{ "label": "Lithuanian", "share": 0.84 }],
+    "languages": [{ "label": "Lithuanian", "share": 0.85 }],
+    "religions": [{ "label": "Roman Catholic", "share": 0.74 }]
+  },
+  "diplomacy": {
+    "alliance_memberships": ["NATO", "EU"],
+    "treaties": [
+      { "name": "North Atlantic Treaty", "kind": "collective_defence", "parties": ["NATO members"], "in_force": true }
+    ],
+    "relations": [
+      { "other_country_id": "by", "status": "hostile", "score": -0.7 }   // status: allied | friendly | neutral | strained | hostile, score: -1..+1
+    ]
+  },
+  "energy": {
+    "oil_dependence": 0.95,                // 0..1, share imported
+    "gas_dependence": 1.0,
+    "top_gas_supplier": "USA / Norway (LNG via Klaipeda)",
+    "pipelines": ["Klaipeda LNG terminal"],
+    "key_ports": ["Klaipeda"],
+    "rail_gauge_mm": 1520,                  // 1435 standard, 1520 broad
+    "strategic_reserves_days": 90
+  },
+  "public_opinion": {
+    "war_support": 0.62,                   // 0..1
+    "institutional_trust": 0.55,
+    "censorship_index": 0.10,
+    "protest_intensity": 0.18,
+    "top_outlets": ["LRT", "Delfi"]
+  },
+  "geography": {
+    "area_km2": 65300,
+    "land_borders": [{ "other": "lv", "length_km": 588 }],
+    "key_bases": [
+      { "name": "Siauliai Air Base (NATO BAP)", "kind": "air_base", "lon": 23.395, "lat": 55.8945, "owner_country_id": "lt" }
+    ]
+  },
+  "available_actions": ["raise_alert_level", "mobilise_reserves", "invoke_article_5"]
+}
+```
+
 ## City
 
 ```jsonc
@@ -52,7 +148,8 @@ independently of the static world.
   "position": [25.2797, 54.6872],   // [lon, lat]
   "population": 588000,
   "importance": "capital",          // capital | major | minor
-  "infrastructure": ["air_base", "rail_hub"]
+  "infrastructure": ["air_base", "rail_hub"],
+  "country_id": "lt"                  // optional; omitted -> alliance-only entity
 }
 ```
 
@@ -64,7 +161,8 @@ independently of the static world.
   "name": "Lithuania",
   "faction_id": "nato",
   "polygon": [[[lon, lat], ...]],   // GeoJSON Polygon coordinates (single ring)
-  "control": 0.95                    // 0..1 share of effective control
+  "control": 0.95,                    // 0..1 share of effective control
+  "country_id": "lt"                  // optional
 }
 ```
 
@@ -82,7 +180,9 @@ independently of the static world.
   "readiness": 0.78,                   // 0..1
   "morale": 0.81,                      // 0..1 (stub, will be driven by intel layer later)
   "echelon": "brigade",
-  "callsign": "IRON-1"
+  "callsign": "IRON-1",
+  "country_id": "lt",                  // optional; omitted -> alliance-only
+  "available_actions": ["advance", "engage"]   // affordances; v1 execution stubbed
 }
 ```
 
@@ -114,6 +214,8 @@ breakdown. See [decision-engine.md](./decision-engine.md) for the formula.
 ## Conventions
 
 - Coordinates are always `[lon, lat]` to match GeoJSON / MapLibre.
-- All floats in `[0, 1]` are normalised intensity / share scores.
-- IDs are namespaced (`city.*`, `unit.<faction>.*`, `terr.*`) and stable across exports of the same scenario.
+- All floats in `[0, 1]` are normalised intensity / share scores. Bilateral relation scores are signed in `[-1, +1]`.
+- IDs are namespaced (`city.*`, `unit.<faction>.*`, `terr.*`) and stable across exports of the same scenario. Country ids are short ISO-style slugs (`lt`, `by`, ...).
+- `country_id` on `City`, `Territory`, `Unit` is optional. If absent, the entity is alliance-only (no parent country dossier).
+- `available_actions` on `Unit` and `Country` is a list of affordance ids. v1 surfaces them as disabled buttons; execution lands later.
 - Unknown fields must be ignored by the frontend (forward-compatible).

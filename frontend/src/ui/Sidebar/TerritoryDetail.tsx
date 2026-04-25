@@ -4,6 +4,7 @@ import { SectionHeader } from "./primitives/SectionHeader";
 import { KeyValueRow } from "./primitives/KeyValueRow";
 import { MetricBar } from "./primitives/MetricBar";
 import { FactionTag } from "./primitives/FactionTag";
+import { CountryBadge } from "./primitives/CountryBadge";
 
 interface Props {
   territory: Territory;
@@ -54,6 +55,12 @@ export function TerritoryDetail({ territory, faction }: Props) {
 
       <SectionHeader label="control" />
       <MetricBar label="effective control" value={territory.control} />
+      <div className="flex items-baseline justify-between px-4 py-1.5 text-xs">
+        <span className="text-ink-200 uppercase tracking-wider2 text-[10px] font-mono">
+          country
+        </span>
+        <CountryBadge countryId={territory.country_id ?? null} />
+      </div>
 
       <SectionHeader label="geometry" />
       <KeyValueRow label="rings" value={territory.polygon.length} />

@@ -2,6 +2,7 @@ import type { City, Faction } from "@/types/scenario";
 import { SectionHeader } from "./primitives/SectionHeader";
 import { KeyValueRow } from "./primitives/KeyValueRow";
 import { FactionTag } from "./primitives/FactionTag";
+import { CountryBadge } from "./primitives/CountryBadge";
 
 interface Props {
   city: City;
@@ -33,6 +34,12 @@ export function CityDetail({ city, faction }: Props) {
         label="population"
         value={city.population.toLocaleString("en-GB")}
       />
+      <div className="flex items-baseline justify-between px-4 py-1.5 text-xs">
+        <span className="text-ink-200 uppercase tracking-wider2 text-[10px] font-mono">
+          country
+        </span>
+        <CountryBadge countryId={city.country_id ?? null} />
+      </div>
 
       <SectionHeader label="infrastructure" trailing={`${city.infrastructure.length}`} />
       {city.infrastructure.length === 0 ? (

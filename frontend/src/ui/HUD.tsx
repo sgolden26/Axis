@@ -40,6 +40,8 @@ export function HUD() {
       </div>
 
       <div className="hairline-l flex items-center gap-4 px-4 font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+        <CountriesButton />
+        <span className="text-ink-300">·</span>
         <IntelTickBadge
           source={intel?.source ?? null}
           tickSeq={intel?.tick_seq ?? null}
@@ -50,6 +52,26 @@ export function HUD() {
         <span>v{__schemaSummary(scenario?.schema_version, intel?.intel_schema_version)}</span>
       </div>
     </header>
+  );
+}
+
+function CountriesButton() {
+  const open = useAppStore((s) => s.rosterOpen);
+  const setOpen = useAppStore((s) => s.setRosterOpen);
+  const count = useAppStore((s) => s.scenario?.countries.length ?? 0);
+  if (count === 0) return null;
+  return (
+    <button
+      onClick={() => setOpen(!open)}
+      aria-pressed={open}
+      className={`hairline border px-2 py-1 font-mono text-[10px] uppercase tracking-wider2 transition-colors ${
+        open
+          ? "border-accent-amber text-accent-amber"
+          : "border-ink-500 text-ink-100 hover:text-ink-50"
+      }`}
+    >
+      countries · {count}
+    </button>
   );
 }
 
