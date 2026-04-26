@@ -23,6 +23,7 @@ export function EventTicker({ thin = false }: { thin?: boolean }) {
   const paused = useAppStore((s) => s.tickerPaused);
   const setPaused = useAppStore((s) => s.setTickerPaused);
   const select = useAppStore((s) => s.select);
+  const openArticle = useAppStore((s) => s.openArticle);
   const scenario = useAppStore((s) => s.scenario);
 
   const events = useMemo(() => {
@@ -47,6 +48,7 @@ export function EventTicker({ thin = false }: { thin?: boolean }) {
     if (oblastIds.has(ev.region_id)) select({ kind: "oblast", id: ev.region_id });
     else if (territoryIds.has(ev.region_id))
       select({ kind: "territory", id: ev.region_id });
+    openArticle(ev);
   };
 
   return (
@@ -71,11 +73,13 @@ export function EventTicker({ thin = false }: { thin?: boolean }) {
       <span
         className={
           thin
-            ? "shrink-0 font-mono text-[8px] uppercase tracking-wider2 text-ink-200"
-            : "font-mono text-[9px] uppercase tracking-wider2 text-ink-200"
+            ? "shrink-0 font-mono text-[8px] uppercase tracking-wider2 text-ink-300"
+            : "shrink-0 font-mono text-[9px] uppercase tracking-wider2"
         }
       >
-        ticker · {intel?.source ?? "—"}
+        <span className="text-ink-300">ticker</span>
+        <span className="px-1 text-ink-300">/</span>
+        <span className="text-ink-100">{intel?.source ?? "—"}</span>
       </span>
       <div className="relative min-w-0 flex-1 overflow-hidden">
         <div

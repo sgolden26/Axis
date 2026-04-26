@@ -6,6 +6,10 @@ import {
   LAYER_CITY_LABEL,
   SOURCE_CITIES,
 } from "../style";
+import { CITY_ICON } from "./iconSprites";
+
+export const LAYER_CITY_ICON = "axis-city-icon-symbol";
+export const LAYER_CITY_PLATE = "axis-city-plate";
 
 export interface CityProps {
   id: string;
@@ -49,18 +53,52 @@ export const cityHaloLayer: LayerSpecification = {
     "circle-color": ["get", "color"],
     "circle-opacity": [
       "case",
-      ["boolean", ["feature-state", "selected"], false], 0.35,
-      ["boolean", ["feature-state", "hover"], false], 0.25,
+      ["boolean", ["feature-state", "hover"], false], 0.18,
       0.0,
     ],
     "circle-radius": [
       "interpolate", ["linear"], ["get", "importance_rank"],
-      1, 10,
-      3, 16,
+      1, 9,
+      3, 14,
     ],
+    "circle-blur": 0.5,
   },
 };
 
+/**
+ * Dark plate that gives every city icon a consistent legibility floor against
+ * the satellite basemap, with a faction-coloured rim that brightens on hover.
+ * The plate also serves as the click target now that the bare dot is retired.
+ */
+export const cityPlateLayer: LayerSpecification = {
+  id: LAYER_CITY_PLATE,
+  type: "circle",
+  source: SOURCE_CITIES,
+  paint: {
+    "circle-color": "rgba(11,15,20,0.85)",
+    "circle-stroke-color": ["get", "color"],
+    "circle-stroke-width": [
+      "case",
+      ["boolean", ["feature-state", "hover"], false], 1.8,
+      ["==", ["get", "importance"], "capital"], 1.6,
+      1.1,
+    ],
+    "circle-radius": [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      3, ["match", ["get", "importance"], "capital", 7, "major", 6, 5],
+      6, ["match", ["get", "importance"], "capital", 11, "major", 9, 7.5],
+      9, ["match", ["get", "importance"], "capital", 15, "major", 12.5, 10],
+    ],
+    "circle-opacity": 0.92,
+  },
+};
+
+/**
+ * Legacy circle dot. Kept exported for backwards compatibility but no longer
+ * registered with the map; every city now wears a plate + skyline icon.
+ */
 export const cityDotLayer: LayerSpecification = {
   id: LAYER_CITY_DOT,
   type: "circle",
@@ -68,17 +106,36 @@ export const cityDotLayer: LayerSpecification = {
   paint: {
     "circle-color": "#0b0f14",
     "circle-stroke-color": ["get", "color"],
-    "circle-stroke-width": [
-      "case",
-      ["==", ["get", "importance"], "capital"], 2.0,
-      1.4,
+    "circle-stroke-width": 1.4,
+    "circle-radius": 4,
+    "circle-opacity": 0,
+    "circle-stroke-opacity": 0,
+  },
+};
+
+/** SDF skyline glyph for every city, sized by importance and zoom. */
+export const cityIconLayer: LayerSpecification = {
+  id: LAYER_CITY_ICON,
+  type: "symbol",
+  source: SOURCE_CITIES,
+  layout: {
+    "icon-image": CITY_ICON,
+    "icon-size": [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      3, ["match", ["get", "importance"], "capital", 0.42, "major", 0.36, 0.30],
+      6, ["match", ["get", "importance"], "capital", 0.62, "major", 0.52, 0.42],
+      9, ["match", ["get", "importance"], "capital", 0.85, "major", 0.7, 0.55],
     ],
-    "circle-radius": [
-      "interpolate", ["linear"], ["get", "importance_rank"],
-      1, 3,
-      2, 4.5,
-      3, 6,
-    ],
+    "icon-allow-overlap": true,
+    "icon-ignore-placement": true,
+  },
+  paint: {
+    "icon-color": ["get", "color"],
+    "icon-halo-color": "#070a0e",
+    "icon-halo-width": 0.8,
+    "icon-opacity": 0.98,
   },
 };
 
@@ -86,12 +143,18 @@ export const cityLabelLayer: LayerSpecification = {
   id: LAYER_CITY_LABEL,
   type: "symbol",
   source: SOURCE_CITIES,
-  filter: [">=", ["get", "importance_rank"], 2],
   layout: {
     "text-field": ["get", "name"],
     "text-font": ["Open Sans Semibold"],
-    "text-size": 11,
-    "text-offset": [0.9, 0],
+    "text-size": [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      4, ["match", ["get", "importance"], "capital", 11, "major", 10, 0],
+      6, ["match", ["get", "importance"], "capital", 12, "major", 11, 10],
+      9, ["match", ["get", "importance"], "capital", 13, "major", 12, 11],
+    ],
+    "text-offset": [1.0, 0],
     "text-anchor": "left",
     "text-letter-spacing": 0.08,
     "text-allow-overlap": false,

@@ -91,8 +91,28 @@ import {
   LAYER_MOVEMENT_ROUTE,
   LAYER_MOVEMENT_DEST,
 } from "./layers/movementOverlay";
+import {
+  ensureSelectionSource,
+  registerSelectionIcon,
+  selectionFeatureCollection,
+  selectionReticleLayer,
+  SOURCE_SELECTION,
+} from "./layers/selectionLayer";
+import {
+  ensureActionDraftOverlay,
+  refreshActionDraftOverlay,
+} from "./layers/actionDraftOverlay";
+import {
+  missileFeatureCollection,
+  missileFillLayer,
+  missileLineLayer,
+  SOURCE_MISSILE,
+  LAYER_MISSILE_FILL,
+  LAYER_MISSILE_LINE,
+} from "./layers/coverageLayer";
 import { clampToGeodesicDisk, haversineKm } from "./geodesic";
 import { groundMoveRadiusKm } from "@/state/groundMove";
+import { snapToCandidate } from "@/state/actionDraft";
 
 // Ordered top-most first. queryRenderedFeatures returns features in render order
 // (top -> bottom); we keep this list aligned with the layer paint order in
@@ -108,6 +128,7 @@ const CLICKABLE_LAYERS = [
   LAYER_FRONTLINE_LINE,
   LAYER_SUPPLY_DASH,
   LAYER_FRONTLINE_BUFFER,
+  LAYER_MISSILE_FILL,
   LAYER_OBLAST_FILL,
   LAYER_COUNTRY_FILL,
 ];
@@ -125,6 +146,7 @@ const SOURCE_TO_KIND: Record<string, SelectableKind> = {
   [SOURCE_FRONTLINE_BUFFER]: "frontline",
   [SOURCE_SUPPLY]: "supply_line",
   [SOURCE_COUNTRIES]: "country",
+  [SOURCE_MISSILE]: "missile_range",
 };
 
 const ASSET_KIND_TO_SELECTABLE: Record<string, SelectableKind> = {
@@ -240,9 +262,29 @@ export function MapView() {
       const sel = st.selection;
       const drafts = st.groundMoveDrafts;
       const topFeat = topClickableFeature(map, ev.point);
+      const click: [number, number] = [ev.lngLat.lng, ev.lngLat.lat];
+
+      // Action draft (engage / strike / rebase / etc) consumes clicks while
+      // pickingTarget. Click on origin = cancel; otherwise snap to nearest
+      // candidate within tolerance (no-op when out of range).
+      if (st.actionDraft && st.actionDraft.pickingTarget) {
+        if (haversineKm(st.actionDraft.origin, click) < MOVE_ORIGIN_EXIT_KM) {
+          st.cancelActionDraft();
+          return;
+        }
+        const snap = snapToCandidate(
+          st.actionDraft.candidates,
+          click,
+          actionDraftSnapKm(map),
+        );
+        if (snap) {
+          st.setActionDraftCandidate(snap.id);
+        }
+        return;
+      }
 
       if (sel?.kind === "unit" && drafts[sel.id]?.pickingDestination) {
-        applyGroundMoveClick(sel.id, [ev.lngLat.lng, ev.lngLat.lat]);
+        applyGroundMoveClick(sel.id, click);
         return;
       }
 
@@ -261,6 +303,15 @@ export function MapView() {
     const onMouseMove = (ev: maplibregl.MapMouseEvent) => {
       const stMove = useAppStore.getState();
       if (stMove.measureActive) return;
+      if (stMove.actionDraft && stMove.actionDraft.pickingTarget) {
+        if (hoverRef.current) {
+          map.setFeatureState(hoverRef.current, { hover: false });
+          hoverRef.current = null;
+        }
+        map.getCanvas().style.cursor = "crosshair";
+        setHover(null);
+        return;
+      }
       if (
         stMove.selection?.kind === "unit" &&
         stMove.groundMoveDrafts[stMove.selection.id]?.pickingDestination
@@ -331,6 +382,18 @@ export function MapView() {
     else map.once("load", run);
   }, [groundMoveDrafts, scenario]);
 
+  const actionDraft = useAppStore((s) => s.actionDraft);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const run = () => {
+      ensureActionDraftOverlay(map);
+      refreshActionDraftOverlay(map, actionDraft);
+    };
+    if (map.isStyleLoaded()) run();
+    else map.once("load", run);
+  }, [actionDraft]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !scenario) return;
@@ -341,6 +404,16 @@ export function MapView() {
       const overrides = useAppStore.getState().unitPositionOverrides;
       const fc = unitFeatureCollection(scenario.units, factionsById, overrides);
       src.setData(withStringIds(fc));
+
+      const sel = useAppStore.getState().selection;
+      if (sel?.kind === "unit") {
+        const selSrc = map.getSource(SOURCE_SELECTION) as
+          | maplibregl.GeoJSONSource
+          | undefined;
+        if (selSrc) {
+          selSrc.setData(selectionFeatureCollection(scenario, sel, "#cbd5e1", overrides));
+        }
+      }
     };
     if (map.isStyleLoaded()) run();
     else map.once("load", run);
@@ -360,6 +433,18 @@ export function MapView() {
       if (src) map.setFeatureState({ source: src, id: selection.id }, { selected: true });
       flyToSelection(map, scenario, selection, borders);
     }
+
+    const updateReticle = () => {
+      const selSrc = map.getSource(SOURCE_SELECTION) as
+        | maplibregl.GeoJSONSource
+        | undefined;
+      if (!selSrc) return;
+      const overrides = useAppStore.getState().unitPositionOverrides;
+      selSrc.setData(selectionFeatureCollection(scenario, selection, "#cbd5e1", overrides));
+    };
+    if (map.isStyleLoaded()) updateReticle();
+    else map.once("load", updateReticle);
+
     selectionRef.current = selection;
   }, [selection, scenario, borders]);
 
@@ -395,11 +480,13 @@ export function MapView() {
     const map = mapRef.current;
     if (!map) return;
     const st = useAppStore.getState();
-    const picking =
+    const groundPicking =
       st.selection?.kind === "unit" &&
       st.groundMoveDrafts[st.selection.id]?.pickingDestination;
-    map.getCanvas().style.cursor = measureActive || picking ? "crosshair" : "";
-  }, [measureActive, selection, groundMoveDrafts]);
+    const actionPicking = !!st.actionDraft?.pickingTarget;
+    map.getCanvas().style.cursor =
+      measureActive || groundPicking || actionPicking ? "crosshair" : "";
+  }, [measureActive, selection, groundMoveDrafts, actionDraft]);
 
   return <div ref={containerRef} className="absolute inset-0" />;
 }
@@ -423,9 +510,10 @@ function sourceForKind(kind: NonNullable<Selection>["kind"]): string | null {
     case "naval_base":
     case "border_crossing":
       return SOURCE_ASSETS;
+    case "missile_range":
+      return SOURCE_MISSILE;
     case "territory":
     case "isr_coverage":
-    case "missile_range":
     case "aor":
       return null;
   }
@@ -648,6 +736,7 @@ function addOrUpdateData(
   const frontlineLine = frontlineLineCollection(scenario.frontlines);
   const frontlineBuf = frontlineBufferCollection(scenario.frontlines);
   const supply = supplyFeatureCollection(scenario.supply_lines, factionsById);
+  const missile = missileFeatureCollection(scenario.missile_ranges, factionsById);
 
   upsertGeoJsonSource(map, SOURCE_COUNTRY_CONTEXT, context, false);
   upsertGeoJsonSource(map, SOURCE_COUNTRIES, withStringIds(countries));
@@ -658,10 +747,13 @@ function addOrUpdateData(
   upsertGeoJsonSource(map, SOURCE_CITIES, withStringIds(cities));
   upsertGeoJsonSource(map, SOURCE_UNITS, withStringIds(units));
   upsertGeoJsonSource(map, SOURCE_ASSETS, withStringIds(assets));
+  upsertGeoJsonSource(map, SOURCE_MISSILE, withStringIds(missile));
+  ensureSelectionSource(map);
 
   // Per-(domain x faction) icon sprites must exist before unitDotLayer is
   // added; the layer's icon-image expression resolves to one of these ids.
   registerUnitIcons(map, scenario.factions);
+  registerSelectionIcon(map);
 
   // Layer order: bottom -> top.
   addLayerOnce(map, contextFillLayer);
@@ -670,6 +762,8 @@ function addOrUpdateData(
   addLayerOnce(map, countryLineLayer);
   addLayerOnce(map, oblastFillLayer);
   addLayerOnce(map, oblastLineLayer);
+  addLayerOnce(map, missileFillLayer);
+  addLayerOnce(map, missileLineLayer);
   addLayerOnce(map, frontlineBufferLayer);
   addLayerOnce(map, supplyLineLayer);
   addLayerOnce(map, supplyDashLayer);
@@ -683,9 +777,25 @@ function addOrUpdateData(
   addLayerOnce(map, unitHaloLayer);
   addLayerOnce(map, unitDotLayer);
   addLayerOnce(map, unitGlyphLayer);
+  addLayerOnce(map, selectionReticleLayer);
 
   ensureMovementOverlay(map);
   refreshMovementOverlayData(map, useAppStore.getState().groundMoveDrafts, scenario.units);
+  ensureActionDraftOverlay(map);
+  refreshActionDraftOverlay(map, useAppStore.getState().actionDraft);
+
+  const sel = useAppStore.getState().selection;
+  const overrides = useAppStore.getState().unitPositionOverrides;
+  const selSrc = map.getSource(SOURCE_SELECTION) as
+    | maplibregl.GeoJSONSource
+    | undefined;
+  if (selSrc) selSrc.setData(selectionFeatureCollection(scenario, sel, "#cbd5e1", overrides));
+
+  // Layer visibility is applied in a separate effect, but that effect can run
+  // before this function first adds layers (e.g. scenario before borders). New
+  // layers default to visible, so re-sync with the store whenever data layers
+  // are (re)built.
+  applyLayerVisibility(map, useAppStore.getState().visibleLayers);
 }
 
 function addLayerOnce(map: MlMap, spec: maplibregl.LayerSpecification) {
@@ -717,6 +827,15 @@ function withStringIds<G extends GeoJSON.Geometry, P extends { id: string }>(
     ...fc,
     features: fc.features.map((f) => ({ ...f, id: f.properties.id })),
   };
+}
+
+/** Snap tolerance in km, scaled to current zoom so candidate dots stay easy
+ *  to hit at any pitch. ~12 px at the current zoom. */
+function actionDraftSnapKm(map: MlMap): number {
+  const zoom = map.getZoom();
+  const metresPerPixel = (40075016 * Math.cos((map.getCenter().lat * Math.PI) / 180)) /
+    Math.pow(2, zoom + 8);
+  return (metresPerPixel * 18) / 1000;
 }
 
 function applyGroundMoveClick(unitId: string, click: [number, number]): void {
@@ -754,6 +873,8 @@ function applyLayerVisibility(map: MlMap, vis: Record<LayerKey, boolean>) {
   set(LAYER_FRONTLINE_LINE, vis.frontline);
   set(LAYER_SUPPLY_LINE, vis.supply_lines);
   set(LAYER_SUPPLY_DASH, vis.supply_lines);
+  set(LAYER_MISSILE_FILL, vis.missile_ranges);
+  set(LAYER_MISSILE_LINE, vis.missile_ranges);
   set(LAYER_MOVEMENT_FILL, vis.units_ground);
   set(LAYER_MOVEMENT_RING, vis.units_ground);
   set(LAYER_MOVEMENT_ROUTE, vis.units_ground);

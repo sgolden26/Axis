@@ -28,25 +28,32 @@ export function RightPanel() {
   }
 
   return (
-    <aside className="hairline-l flex h-full w-[400px] shrink-0 flex-col bg-ink-800">
-      <div className="hairline-b flex items-center bg-ink-800">
+    <aside className="hairline-l panel-surface flex h-full w-[400px] shrink-0 flex-col">
+      <div className="hairline-b flex items-stretch">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex-1 px-3 py-2 font-mono text-[10px] uppercase tracking-wider2 transition-colors ${
+            aria-pressed={tab === t.id}
+            className={`relative flex-1 px-3 py-2.5 font-mono text-[11px] uppercase tracking-wider2 transition-colors ${
               tab === t.id
-                ? "bg-ink-700 text-ink-50"
+                ? "text-ink-50"
                 : "text-ink-200 hover:text-ink-50"
             }`}
-            aria-pressed={tab === t.id}
           >
             {t.label}
+            <span
+              aria-hidden
+              className={`absolute inset-x-3 -bottom-px h-[2px] transition-opacity ${
+                tab === t.id ? "opacity-100" : "opacity-0"
+              }`}
+              style={{ background: "var(--accent-blue)" }}
+            />
           </button>
         ))}
         <button
           onClick={() => setOpen(false)}
-          className="px-3 py-2 font-mono text-[10px] uppercase tracking-wider2 text-ink-200 hover:text-ink-50"
+          className="px-3 py-2 font-mono text-[11px] uppercase tracking-wider2 text-ink-300 transition-colors hover:text-ink-50"
           title="Collapse ( ] )"
         >
           ›

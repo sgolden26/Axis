@@ -74,9 +74,11 @@ export const unitSchema = z.object({
   strength: z.number().min(0).max(1),
   readiness: z.number().min(0).max(1),
   morale: z.number().min(0).max(1),
+  entrenchment: z.number().min(0).max(1).default(0),
   echelon: z.string(),
   callsign: z.string(),
   country_id: z.string().nullable().optional(),
+  home_base_id: z.string().nullable().optional(),
   available_actions: z.array(z.string()).default([]),
 });
 export type Unit = z.infer<typeof unitSchema>;

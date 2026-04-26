@@ -119,6 +119,8 @@ def build_source(
             max_records_per_region=s.gdelt_max_records_per_region,
             min_abs_tone=s.gdelt_min_abs_tone,
             timeout_s=s.gdelt_request_timeout_s,
+            cache_path=base / "gdelt" / "live_cache.json",
+            cache_ttl_hours=s.gdelt_cache_ttl_hours,
         )
         fallback_kind = s.live_fallback_source
         if fallback_kind not in ("curated", "gdelt_snapshot"):

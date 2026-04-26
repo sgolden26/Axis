@@ -7,11 +7,15 @@ interface Props {
 export function FactionTag({ faction }: Props) {
   return (
     <span
-      className="inline-flex items-center gap-1.5 border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider2"
-      style={{ borderColor: faction.color, color: faction.color }}
+      className="inline-flex items-center gap-1.5 border px-1.5 py-[3px] font-mono text-[10px] uppercase tracking-wider2"
+      style={{
+        borderColor: `${faction.color}66`,
+        color: faction.color,
+        background: `${faction.color}14`,
+      }}
     >
       <span
-        className="inline-block h-1.5 w-1.5"
+        className="inline-block h-1.5 w-1.5 rounded-[1px]"
         style={{ background: faction.color }}
       />
       {faction.name}

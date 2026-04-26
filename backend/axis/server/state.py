@@ -8,7 +8,12 @@ from typing import Any
 from axis import scenarios
 from axis.domain.theater import Theater
 from axis.serialization.snapshot import SnapshotExporter
-from axis.sim.orders import ExecutionResult, OrderBatch
+from axis.sim.orders import (
+    ExecutionResult,
+    OrderBatch,
+    RoundExecutionResult,
+    execute_round,
+)
 
 
 class TheaterStore:
@@ -41,6 +46,15 @@ class TheaterStore:
         """Execute `batch` against the live theatre, returning result + snapshot."""
         with self._lock:
             result = batch.execute(self._theater)
+            snapshot = SnapshotExporter(self._theater).to_dict()
+            return result, snapshot
+
+    def apply_round(
+        self, batches: list[OrderBatch]
+    ) -> tuple[RoundExecutionResult, dict[str, Any]]:
+        """Execute a hot-seat round (multiple per-team batches) atomically."""
+        with self._lock:
+            result = execute_round(self._theater, batches)
             snapshot = SnapshotExporter(self._theater).to_dict()
             return result, snapshot
 

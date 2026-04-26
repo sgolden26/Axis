@@ -8,7 +8,10 @@ API reference: https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/
 
 Design notes:
 
-- Pure stdlib (`urllib.request`) so we don't pull in `requests`.
+- Pure stdlib (`http.client` + `urllib.parse`) so we don't pull in `requests`.
+  We use a persistent `HTTPSConnection` across the per-region calls because
+  GDELT's free-tier endpoint has a slow TLS handshake; reusing one socket
+  amortises that cost over the whole batch.
 - Per-region queries with country/keyword filters; English-language only
   to keep the classifier simple.
 - The classifier is a small regex word list. Articles whose titles don't
@@ -22,14 +25,15 @@ Design notes:
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import logging
 import re
-import urllib.error
+import time
 import urllib.parse
-import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Iterable
 
 from axis.intel.events import DEFAULT_CATEGORY_SIGN, Event, EventCategory
@@ -38,7 +42,21 @@ from axis.intel.sources.base import IntelSource
 log = logging.getLogger(__name__)
 
 GDELT_DOC_API = "https://api.gdeltproject.org/api/v2/doc/doc"
+_GDELT_PARSED = urllib.parse.urlsplit(GDELT_DOC_API)
+_GDELT_HOST = _GDELT_PARSED.hostname or "api.gdeltproject.org"
+_GDELT_PORT = _GDELT_PARSED.port or 443
+_GDELT_PATH = _GDELT_PARSED.path or "/api/v2/doc/doc"
 USER_AGENT = "axis-wargame/0.2 (+https://github.com/sgolden26/Axis)"
+
+# Network errors we treat as transient and worth one retry. http.client raises
+# its own HTTPException family for protocol-level issues (RemoteDisconnected,
+# BadStatusLine, etc.); ssl/socket failures land in OSError.
+_TRANSIENT_NET_ERRORS: tuple[type[BaseException], ...] = (
+    TimeoutError,
+    http.client.HTTPException,
+    OSError,
+)
+_RETRY_BACKOFF_S = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +194,53 @@ _CATEGORY_PATTERNS: tuple[tuple[EventCategory, re.Pattern[str]], ...] = (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class _CacheEntry:
+    """In-memory representation of a successful prior fetch."""
+
+    fetched_at: datetime
+    lookback_hours: int
+    region_ids: tuple[str, ...]
+    events: tuple[Event, ...]
+
+
+class _ConnState:
+    """Holds a single persistent HTTPS connection across region fetches.
+
+    GDELT's free-tier API does a slow TLS handshake (often 10s+ on its own).
+    Reusing the connection turns 14 handshakes per batch into 1; on any
+    network/protocol error we drop the socket so the next request gets a
+    fresh one. The class is intentionally not thread-safe; one instance per
+    `fetch()` call.
+    """
+
+    __slots__ = ("_host", "_port", "_timeout_s", "_conn")
+
+    def __init__(self, host: str, port: int, timeout_s: float) -> None:
+        self._host = host
+        self._port = port
+        self._timeout_s = timeout_s
+        self._conn: http.client.HTTPSConnection | None = None
+
+    def get(self) -> http.client.HTTPSConnection:
+        if self._conn is None:
+            self._conn = http.client.HTTPSConnection(
+                self._host, self._port, timeout=self._timeout_s
+            )
+        return self._conn
+
+    def reset(self) -> None:
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            except Exception:  # noqa: BLE001 - close is best-effort
+                pass
+            self._conn = None
+
+    def close(self) -> None:
+        self.reset()
+
+
 class GdeltLiveSource(IntelSource):
     name = "gdelt_live"
 
@@ -185,42 +250,100 @@ class GdeltLiveSource(IntelSource):
         lookback_hours: int = 48,
         max_records_per_region: int = 75,
         min_abs_tone: float = 1.0,
-        timeout_s: float = 10.0,
+        timeout_s: float = 30.0,
         region_queries: Iterable[_RegionQuery] | None = None,
+        cache_path: Path | str | None = None,
+        cache_ttl_hours: float = 12.0,
     ) -> None:
         self._lookback_hours = max(1, int(lookback_hours))
         self._max_records = min(250, max(10, int(max_records_per_region)))
         self._min_abs_tone = float(min_abs_tone)
         self._timeout_s = float(timeout_s)
         self._regions = tuple(region_queries) if region_queries is not None else DEFAULT_REGION_QUERIES
+        self._cache_path = Path(cache_path) if cache_path else None
+        self._cache_ttl = timedelta(hours=max(0.0, float(cache_ttl_hours)))
 
-    def fetch(self, now: datetime) -> list[Event]:  # noqa: ARG002 - timespan handles "now" implicitly
-        events: list[Event] = []
+    def fetch(self, now: datetime) -> list[Event]:
+        # Cache lookup: if we have a hit whose config matches and is younger
+        # than the TTL, skip the network entirely. Half a day of staleness
+        # is well inside the morale aggregator's ~5-day decay window.
+        cached = self._load_cache()
+        if cached is not None and self._cache_is_fresh(cached, now):
+            log.info(
+                "gdelt_live: cache hit (%d events, age=%.1fh, ttl=%.1fh)",
+                len(cached.events),
+                (now - cached.fetched_at).total_seconds() / 3600.0,
+                self._cache_ttl.total_seconds() / 3600.0,
+            )
+            return list(cached.events)
+
         # GDELT routinely returns the same wire story syndicated across many
         # domains. Dedupe per (region, normalized title) keeping the earliest
         # publication time so the morale aggregator sees one signal per story.
         seen: dict[tuple[str, str], Event] = {}
-        for rq in self._regions:
-            articles = self._fetch_region(rq)
-            for art in articles:
-                ev = self._article_to_event(rq.region_id, art)
-                if ev is None:
+        n_ok = 0
+        n_fail = 0
+        state = _ConnState(_GDELT_HOST, _GDELT_PORT, self._timeout_s)
+        try:
+            for rq in self._regions:
+                try:
+                    articles = self._fetch_region(rq, state)
+                except RuntimeError as exc:
+                    # Per-region failure must not poison the rest of the batch:
+                    # log it, count it, and move on. The wider _FallbackSource
+                    # only kicks in when every region fails AND we have no
+                    # cache to fall back to.
+                    n_fail += 1
+                    log.warning("%s", exc)
                     continue
-                key = (rq.region_id, _norm_title(ev.headline))
-                prev = seen.get(key)
-                if prev is None or ev.ts < prev.ts:
-                    seen[key] = ev
+                n_ok += 1
+                for art in articles:
+                    ev = self._article_to_event(rq.region_id, art)
+                    if ev is None:
+                        continue
+                    key = (rq.region_id, _norm_title(ev.headline))
+                    prev = seen.get(key)
+                    if prev is None or ev.ts < prev.ts:
+                        seen[key] = ev
+        finally:
+            state.close()
 
         events = sorted(seen.values(), key=lambda e: e.ts, reverse=True)
         log.info(
-            "gdelt_live: fetched %d unique events across %d regions (lookback=%dh)",
+            "gdelt_live: fetched %d unique events across %d/%d regions (lookback=%dh)",
             len(events),
+            n_ok,
             len(self._regions),
             self._lookback_hours,
         )
-        return events
 
-    def _fetch_region(self, rq: _RegionQuery) -> list[dict]:
+        if n_ok > 0:
+            self._save_cache(events, now)
+            return events
+
+        # Total network failure. Prefer a stale cache over a fallback source
+        # because stale GDELT > curated for live-feel.
+        if cached is not None:
+            log.warning(
+                "gdelt_live: all %d region fetches failed; serving stale cache "
+                "from %s (%d events)",
+                n_fail,
+                cached.fetched_at.isoformat(),
+                len(cached.events),
+            )
+            return list(cached.events)
+
+        raise RuntimeError(
+            f"gdelt_live: all {n_fail} region fetches failed and no cache available"
+        )
+
+    def _fetch_region(self, rq: _RegionQuery, state: _ConnState) -> list[dict]:
+        """GET one region's articles, retrying once on a transient failure.
+
+        Reuses `state`'s persistent HTTPS connection so the slow TLS handshake
+        is amortised across the whole batch. On any network/protocol error
+        we close the connection (it may be half-open) so the next attempt
+        starts clean."""
         params = {
             "query": f"{rq.query} sourcelang:eng",
             "mode": "ArtList",
@@ -229,29 +352,66 @@ class GdeltLiveSource(IntelSource):
             "maxrecords": str(self._max_records),
             "sort": "HybridRel",
         }
-        url = f"{GDELT_DOC_API}?{urllib.parse.urlencode(params)}"
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        try:
-            with urllib.request.urlopen(req, timeout=self._timeout_s) as resp:
+        path = f"{_GDELT_PATH}?{urllib.parse.urlencode(params)}"
+        headers = {
+            "User-Agent": USER_AGENT,
+            "Accept": "application/json",
+            "Connection": "keep-alive",
+        }
+
+        last_exc: BaseException | None = None
+        last_status: int | None = None
+        for attempt in range(2):  # one try + one retry
+            if attempt > 0:
+                time.sleep(_RETRY_BACKOFF_S)
+                # The previous attempt may have left the connection in a
+                # half-open state; force a fresh socket for the retry.
+                state.reset()
+            try:
+                conn = state.get()
+                conn.request("GET", path, headers=headers)
+                resp = conn.getresponse()
                 body = resp.read().decode("utf-8", errors="replace")
-        except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            raise RuntimeError(
-                f"gdelt_live: failed to fetch region {rq.region_id!r}: {exc}"
-            ) from exc
+                status = resp.status
+            except _TRANSIENT_NET_ERRORS as exc:
+                last_exc = exc
+                state.reset()
+                continue
 
-        if not body.strip():
-            return []
-        try:
-            payload = json.loads(body)
-        except json.JSONDecodeError as exc:
-            raise RuntimeError(
-                f"gdelt_live: malformed JSON for region {rq.region_id!r}: {exc}"
-            ) from exc
+            # Treat 429 / 5xx as retryable and re-handshake. Other 4xx are
+            # definitive (bad query, etc) and don't benefit from a retry.
+            if status == 429 or status >= 500:
+                last_exc = RuntimeError(f"HTTP {status}")
+                last_status = status
+                state.reset()
+                continue
+            if status >= 400:
+                raise RuntimeError(
+                    f"gdelt_live: region {rq.region_id!r} HTTP {status}"
+                )
 
-        articles = payload.get("articles") if isinstance(payload, dict) else None
-        if not isinstance(articles, list):
-            return []
-        return articles
+            if not body.strip():
+                return []
+            try:
+                payload = json.loads(body)
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(
+                    f"gdelt_live: malformed JSON for region {rq.region_id!r}: {exc}"
+                ) from exc
+
+            articles = payload.get("articles") if isinstance(payload, dict) else None
+            if not isinstance(articles, list):
+                return []
+            return articles
+
+        suffix = (
+            f"HTTP {last_status}"
+            if last_status is not None
+            else f"{type(last_exc).__name__}: {last_exc}"
+        )
+        raise RuntimeError(
+            f"gdelt_live: failed to fetch region {rq.region_id!r} after retry ({suffix})"
+        )
 
     def _article_to_event(self, region_id: str, art: dict) -> Event | None:
         title = str(art.get("title") or "").strip()
@@ -296,6 +456,78 @@ class GdeltLiveSource(IntelSource):
             source="gdelt",
             url=clean_url,
         )
+
+    # ---------- cache ----------
+
+    def _cache_is_fresh(self, entry: _CacheEntry, now: datetime) -> bool:
+        if self._cache_ttl.total_seconds() <= 0:
+            return False
+        if entry.lookback_hours != self._lookback_hours:
+            return False
+        if entry.region_ids != tuple(rq.region_id for rq in self._regions):
+            return False
+        return (now - entry.fetched_at) < self._cache_ttl
+
+    def _load_cache(self) -> _CacheEntry | None:
+        if self._cache_path is None or not self._cache_path.exists():
+            return None
+        try:
+            raw = json.loads(self._cache_path.read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            log.warning("gdelt_live: ignoring unreadable cache %s: %s", self._cache_path, exc)
+            return None
+        try:
+            fetched_at = datetime.fromisoformat(str(raw["fetched_at"]))
+            if fetched_at.tzinfo is None:
+                fetched_at = fetched_at.replace(tzinfo=timezone.utc)
+            lookback_hours = int(raw["lookback_hours"])
+            region_ids = tuple(str(r) for r in raw.get("region_ids", ()))
+            events = tuple(_event_from_cache_dict(d) for d in raw.get("events", ()))
+        except (KeyError, TypeError, ValueError) as exc:
+            log.warning("gdelt_live: ignoring malformed cache %s: %s", self._cache_path, exc)
+            return None
+        return _CacheEntry(
+            fetched_at=fetched_at,
+            lookback_hours=lookback_hours,
+            region_ids=region_ids,
+            events=events,
+        )
+
+    def _save_cache(self, events: list[Event], now: datetime) -> None:
+        if self._cache_path is None:
+            return
+        payload = {
+            "fetched_at": now.isoformat(),
+            "lookback_hours": self._lookback_hours,
+            "region_ids": [rq.region_id for rq in self._regions],
+            "events": [e.to_dict() for e in events],
+        }
+        try:
+            self._cache_path.parent.mkdir(parents=True, exist_ok=True)
+            self._cache_path.write_text(json.dumps(payload, indent=2) + "\n")
+        except OSError as exc:
+            log.warning("gdelt_live: failed to write cache %s: %s", self._cache_path, exc)
+
+
+def _event_from_cache_dict(raw: dict) -> Event:
+    """Inverse of `Event.to_dict` for our cache file. Mirrors gdelt_snapshot's
+    parser but lives here so the cache format stays a private contract."""
+    ts = datetime.fromisoformat(str(raw["ts"]).replace("Z", "+00:00"))
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    url_raw = raw.get("url")
+    url = str(url_raw).strip() if isinstance(url_raw, str) and url_raw.strip() else None
+    return Event(
+        id=str(raw["id"]),
+        region_id=str(raw["region_id"]),
+        ts=ts,
+        category=EventCategory(raw["category"]),
+        headline=str(raw["headline"]),
+        snippet=str(raw.get("snippet", "")),
+        weight=float(raw["weight"]),
+        source=str(raw.get("source", "gdelt")),
+        url=url,
+    )
 
 
 def _safe_float(value: object) -> float | None:

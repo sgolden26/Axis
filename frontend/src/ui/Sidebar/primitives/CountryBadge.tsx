@@ -25,7 +25,7 @@ export function CountryBadge({ countryId }: Props) {
   if (!country) {
     return (
       <span
-        className="hairline border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider2 text-ink-300"
+        className="border border-[var(--hairline)] px-1.5 py-[3px] font-mono text-[10px] uppercase tracking-wider2 text-ink-300"
         title="dossier not seeded"
       >
         {countryId}
@@ -36,7 +36,7 @@ export function CountryBadge({ countryId }: Props) {
   return (
     <button
       onClick={() => select({ kind: "country", id: country.id })}
-      className="hairline inline-flex items-center gap-1.5 border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider2 text-ink-50 hover:bg-ink-700"
+      className="inline-flex items-center gap-1.5 border border-[var(--hairline)] bg-ink-700/40 px-1.5 py-[3px] font-mono text-[10px] uppercase tracking-wider2 text-ink-50 transition-colors hover:border-[var(--hairline-strong)] hover:bg-ink-700/80"
       title={`Open ${country.name} dossier`}
     >
       <span className="text-[12px] leading-none">{country.flag_emoji}</span>

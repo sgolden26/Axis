@@ -1,5 +1,6 @@
 import type { IntelEvent, RegionIntel } from "@/types/intel";
 import type { Faction } from "@/types/scenario";
+import { useAppStore } from "@/state/store";
 import { Sparkline } from "./Sparkline";
 
 function hostname(url: string): string {
@@ -67,6 +68,7 @@ export function RegionSummary({ region, regionLabel, faction }: Props) {
   const score = Math.round(region.morale_score);
   const trendSign = region.trend_delta >= 0 ? "+" : "";
   const now = Date.now();
+  const openArticle = useAppStore((s) => s.openArticle);
   // Drivers only carry an event_id; resolve URLs by looking the event up in
   // the region's recent_events list so the "source" affordance is consistent
   // across both panels.
@@ -161,21 +163,28 @@ export function RegionSummary({ region, regionLabel, faction }: Props) {
         </div>
         <ul className="mt-2 flex flex-col gap-2">
           {region.recent_events.slice(0, 3).map((e) => (
-            <li key={e.id} className="leading-snug">
-              <div className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-wider2 text-ink-200">
-                <span>{formatTimeAgo(e.ts, now)}</span>
-                <span className="text-ink-300">·</span>
-                <span>{CATEGORY_LABEL[e.category] ?? e.category}</span>
-                <span className="text-ink-300">·</span>
-                <span className="text-ink-300">{e.source}</span>
-              </div>
-              <div className="flex items-start justify-between gap-2">
-                <div className="text-[12px] text-ink-50">{e.headline}</div>
-                {e.url && <SourceLink url={e.url} />}
-              </div>
-              {e.snippet && (
-                <div className="mt-0.5 text-[11px] text-ink-200">{e.snippet}</div>
-              )}
+            <li key={e.id}>
+              <button
+                type="button"
+                onClick={() => openArticle(e)}
+                className="-mx-1 flex w-full flex-col items-stretch gap-0.5 rounded-sm px-1 py-1 text-left leading-snug transition-colors hover:bg-ink-700/40"
+                title="Open article"
+              >
+                <div className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-wider2 text-ink-200">
+                  <span>{formatTimeAgo(e.ts, now)}</span>
+                  <span className="text-ink-300">·</span>
+                  <span>{CATEGORY_LABEL[e.category] ?? e.category}</span>
+                  <span className="text-ink-300">·</span>
+                  <span className="text-ink-300">{e.source}</span>
+                </div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="text-[12px] text-ink-50">{e.headline}</div>
+                  {e.url && <SourceLink url={e.url} />}
+                </div>
+                {e.snippet && (
+                  <div className="mt-0.5 text-[11px] text-ink-200">{e.snippet}</div>
+                )}
+              </button>
             </li>
           ))}
         </ul>

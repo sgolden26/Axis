@@ -29,7 +29,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from axis.server.state import TheaterStore, get_store
-from axis.sim.orders import OrderBatch
+from axis.sim.orders import OrderBatch, OrderRegistry
 
 
 def create_app(*, store: TheaterStore | None = None) -> FastAPI:
@@ -62,8 +62,38 @@ def create_app(*, store: TheaterStore | None = None) -> FastAPI:
         return {
             "ok": result.ok,
             "outcomes": [o.to_dict() for o in result.outcomes],
+            "political_summary": result.political_summary,
             "snapshot": snapshot,
         }
+
+    @app.post("/api/orders/execute_round")
+    def execute_round_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
+        """Hot-seat round: accepts {batches: [OrderBatch, OrderBatch]} and
+        executes both teams' orders as one phased pass."""
+        raw_batches = payload.get("batches")
+        if not isinstance(raw_batches, list) or len(raw_batches) == 0:
+            raise HTTPException(status_code=400, detail="batches must be a non-empty list")
+        try:
+            batches = [OrderBatch.from_dict(b) for b in raw_batches]
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        try:
+            result, snapshot = _store().apply_round(batches)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {
+            "ok": result.ok,
+            "outcomes_by_team": {
+                team: [o.to_dict() for o in outs]
+                for team, outs in result.outcomes_by_team.items()
+            },
+            "political_summary": result.political_summary,
+            "snapshot": snapshot,
+        }
+
+    @app.get("/api/orders/catalogue")
+    def catalogue() -> dict[str, Any]:
+        return {"orders": OrderRegistry.catalogue()}
 
     @app.post("/api/reset")
     def reset() -> dict[str, Any]:

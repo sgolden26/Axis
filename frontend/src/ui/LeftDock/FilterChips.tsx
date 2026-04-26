@@ -11,6 +11,7 @@ const LAYER_LABEL: Record<LayerKey, string> = {
   naval_bases: "Naval bases",
   border_crossings: "Crossings",
   supply_lines: "Supply",
+  missile_ranges: "Missile arcs",
   frontline: "Front",
 };
 
@@ -21,6 +22,7 @@ const GROUPS: { label: string; keys: LayerKey[] }[] = [
     label: "logistics",
     keys: ["supply_lines", "depots", "airfields", "naval_bases", "border_crossings"],
   },
+  { label: "fires", keys: ["missile_ranges"] },
 ];
 
 export function FilterChips() {
@@ -28,10 +30,10 @@ export function FilterChips() {
   const toggle = useAppStore((s) => s.toggleLayer);
 
   return (
-    <div className="px-3 py-2 space-y-2">
+    <div className="space-y-3 px-3 py-3">
       {GROUPS.map((group) => (
         <div key={group.label}>
-          <div className="mb-1 font-mono text-[9px] uppercase tracking-wider2 text-ink-200">
+          <div className="mb-1.5 font-mono text-[9px] uppercase tracking-wider2 text-ink-300">
             {group.label}
           </div>
           <div className="flex flex-wrap gap-1">
@@ -41,10 +43,10 @@ export function FilterChips() {
                 <button
                   key={key}
                   onClick={() => toggle(key)}
-                  className={`border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider2 transition-colors ${
+                  className={`border px-2 py-[3px] font-mono text-[9px] uppercase tracking-wider2 transition-colors ${
                     active
-                      ? "border-ink-300 bg-ink-700 text-ink-50"
-                      : "border-ink-600 text-ink-300 hover:border-ink-400 hover:text-ink-100"
+                      ? "border-faction-nato/40 bg-faction-nato/10 text-faction-nato"
+                      : "border-[rgba(255,255,255,0.06)] bg-ink-700/40 text-ink-200 hover:border-[rgba(255,255,255,0.14)] hover:text-ink-50"
                   }`}
                   aria-pressed={active}
                   title={LAYER_LABEL[key]}

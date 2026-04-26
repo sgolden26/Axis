@@ -198,30 +198,35 @@ export function HoverCard() {
 
   return (
     <div
-      className="hairline pointer-events-none absolute z-30 max-w-[260px] border border-ink-500 bg-ink-900/95 px-2 py-1.5 shadow-glow"
+      className="pointer-events-none absolute z-30 max-w-[260px] border border-[var(--hairline-strong)] bg-ink-900/85 px-2.5 py-2 shadow-2xl backdrop-blur-md"
       style={{ left: hover.x + offsetX, top: hover.y + offsetY }}
     >
       <div className="flex items-center gap-2">
         {card.factionColor && (
           <span
-            className="inline-block h-2 w-2"
-            style={{ background: card.factionColor }}
+            className="inline-block h-1.5 w-1.5 rounded-[1px]"
+            style={{
+              background: card.factionColor,
+              boxShadow: `0 0 6px ${card.factionColor}80`,
+            }}
           />
         )}
-        <span className="font-mono text-[9px] uppercase tracking-wider2 text-ink-200">
+        <span className="font-mono text-[9px] uppercase tracking-wider2 text-ink-300">
           {card.kind}
         </span>
       </div>
-      <div className="mt-0.5 truncate text-[12px] font-semibold text-ink-50">
+      <div className="mt-1 truncate text-[12px] font-semibold tracking-tight text-ink-50">
         {card.title}
       </div>
-      <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5">
+      <div className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
         {card.rows.map(([k, v]) => (
           <div key={k} className="contents">
-            <span className="font-mono text-[9px] uppercase tracking-wider2 text-ink-200">
+            <span className="font-mono text-[9px] uppercase tracking-wider2 text-ink-300">
               {k}
             </span>
-            <span className="font-mono text-[10px] text-ink-50">{v}</span>
+            <span className="text-right font-mono text-[10px] tabular-nums text-ink-50">
+              {v}
+            </span>
           </div>
         ))}
       </div>

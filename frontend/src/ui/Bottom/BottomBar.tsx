@@ -9,8 +9,8 @@ export function BottomBar() {
     return <EventTicker thin />;
   }
   return (
-    <div className="hairline-t flex flex-col bg-ink-900/95">
-      <div className="hairline-b flex items-center divide-x divide-ink-600">
+    <div className="hairline-t panel-surface flex flex-col">
+      <div className="hairline-b flex items-center divide-x divide-[var(--hairline)]">
         <MeasureTool />
         <Bookmarks />
       </div>

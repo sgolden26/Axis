@@ -137,16 +137,31 @@ export function Sidebar() {
     }
   }
 
+  const kindBreadcrumb = selectionBreadcrumb(k);
+
   return (
-    <div className="flex h-full flex-col">
-      <div className="hairline-b flex items-center justify-between px-4 py-2">
-        <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
-          contact // {title}
+    <div className="flex h-full flex-col panel-surface">
+      <div className="hairline-b flex items-center justify-between gap-3 px-4 py-2">
+        <span className="min-w-0 truncate font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+          contact
+          {kindBreadcrumb ? (
+            <>
+              <span className="px-1.5 text-ink-300">/</span>
+              <span className="text-ink-100">{kindBreadcrumb}</span>
+            </>
+          ) : null}
+          {selection ? (
+            <>
+              <span className="px-1.5 text-ink-300">/</span>
+              <span className="text-ink-50">{title}</span>
+            </>
+          ) : null}
         </span>
         {selection && (
           <button
             onClick={clearSelection}
-            className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200 hover:text-ink-50"
+            className="shrink-0 font-mono text-[10px] uppercase tracking-wider2 text-ink-200 transition-colors hover:text-ink-50"
+            title="Clear selection"
           >
             clear
           </button>
@@ -155,4 +170,39 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto">{body}</div>
     </div>
   );
+}
+
+function selectionBreadcrumb(kind: string | undefined): string | null {
+  switch (kind) {
+    case "city":
+      return "city";
+    case "unit":
+      return "unit";
+    case "territory":
+      return "territory";
+    case "country":
+      return "country";
+    case "oblast":
+      return "oblast";
+    case "depot":
+      return "depot";
+    case "airfield":
+      return "airfield";
+    case "naval_base":
+      return "naval base";
+    case "border_crossing":
+      return "crossing";
+    case "supply_line":
+      return "supply";
+    case "isr_coverage":
+      return "isr";
+    case "missile_range":
+      return "missile";
+    case "aor":
+      return "aor";
+    case "frontline":
+      return "frontline";
+    default:
+      return null;
+  }
 }

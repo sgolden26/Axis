@@ -8,10 +8,10 @@ export function LeftDock() {
 
   if (!open) {
     return (
-      <div className="hairline-r flex h-full w-7 shrink-0 items-start justify-center bg-ink-800 pt-2">
+      <div className="hairline-r panel-surface flex h-full w-7 shrink-0 items-start justify-center pt-2">
         <button
           onClick={() => setOpen(true)}
-          className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200 hover:text-ink-50"
+          className="font-mono text-[11px] uppercase tracking-wider2 text-ink-300 transition-colors hover:text-ink-50"
           title="Open left dock ( [ )"
         >
           ›
@@ -21,14 +21,17 @@ export function LeftDock() {
   }
 
   return (
-    <aside className="hairline-r flex h-full w-[280px] shrink-0 flex-col bg-ink-800">
-      <div className="hairline-b flex items-center justify-between px-3 py-2">
-        <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
-          theatre
-        </span>
+    <aside className="hairline-r panel-surface flex h-full w-[280px] shrink-0 flex-col">
+      <div className="hairline-b panel-section-bg flex items-center justify-between px-3 py-2">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[9px] text-ink-300">▾</span>
+          <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-100">
+            theatre
+          </span>
+        </div>
         <button
           onClick={() => setOpen(false)}
-          className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200 hover:text-ink-50"
+          className="font-mono text-[11px] uppercase tracking-wider2 text-ink-300 transition-colors hover:text-ink-50"
           title="Collapse ( [ )"
         >
           ‹

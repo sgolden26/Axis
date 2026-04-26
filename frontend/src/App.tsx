@@ -14,6 +14,7 @@ import { KeyboardShortcuts } from "@/ui/KeyboardShortcuts";
 import { DecisionImmersive } from "@/ui/DecisionEngine/DecisionImmersive";
 import { MoveLimitToast } from "@/ui/MoveLimitToast";
 import { OrdersCart } from "@/ui/Orders/OrdersCart";
+import { ArticleDrawer } from "@/ui/Article/ArticleDrawer";
 
 export function App() {
   const setScenario = useAppStore((s) => s.setScenario);
@@ -69,6 +70,7 @@ export function App() {
           {loadError && <ErrorOverlay message={loadError} />}
         </main>
         <RightPanel />
+        <ArticleDrawer />
       </div>
       <BottomBar />
       <DecisionImmersive />

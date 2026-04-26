@@ -128,12 +128,11 @@ export const unitHaloLayer: LayerSpecification = {
     "circle-color": ["get", "color"],
     "circle-opacity": [
       "case",
-      ["boolean", ["feature-state", "selected"], false], 0.55,
-      ["boolean", ["feature-state", "hover"], false], 0.35,
+      ["boolean", ["feature-state", "hover"], false], 0.22,
       0.0,
     ],
-    "circle-radius": 18,
-    "circle-blur": 0.4,
+    "circle-radius": 16,
+    "circle-blur": 0.55,
   },
 };
 

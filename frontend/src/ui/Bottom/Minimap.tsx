@@ -101,8 +101,8 @@ export function Minimap({ className, variant = "default" }: MinimapProps) {
   const shell =
     className ??
     (variant === "pip"
-      ? "hairline relative h-40 w-56 overflow-hidden border border-ink-500 bg-ink-900/90"
-      : "hairline absolute bottom-12 right-3 h-32 w-48 overflow-hidden border border-ink-500 bg-ink-900/90");
+      ? "relative h-40 w-56 overflow-hidden border border-[var(--hairline-strong)] bg-ink-900/90 shadow-xl"
+      : "absolute bottom-12 right-3 h-32 w-48 overflow-hidden border border-[var(--hairline-strong)] bg-ink-900/90 shadow-xl");
 
   if (skipDefault) return null;
 
@@ -119,7 +119,7 @@ export function Minimap({ className, variant = "default" }: MinimapProps) {
         className="absolute inset-0 cursor-crosshair"
         title="Click to recenter"
       />
-      <div className="hairline-t absolute bottom-0 left-0 right-0 bg-ink-900/80 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider2 text-ink-200">
+      <div className="absolute bottom-0 left-0 right-0 border-t border-[var(--hairline)] bg-ink-900/85 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider2 text-ink-300 backdrop-blur-sm">
         minimap
       </div>
     </div>

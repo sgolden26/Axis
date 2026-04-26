@@ -142,12 +142,15 @@ class SnapshotExporter:
             "strength": u.strength,
             "readiness": u.readiness,
             "morale": u.morale,
+            "entrenchment": u.entrenchment,
             "echelon": u.echelon,
             "callsign": u.callsign,
             "available_actions": list(u.available_actions),
         }
         if u.country_id is not None:
             out["country_id"] = u.country_id
+        if u.home_base_id is not None:
+            out["home_base_id"] = u.home_base_id
         return out
 
     @classmethod
