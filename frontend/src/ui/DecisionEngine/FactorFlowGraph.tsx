@@ -351,8 +351,14 @@ export function FactorFlowGraph({
               const active = actId === selectedActionId;
               const { a: lineA, b: lineB } = actionTitleLines(n.label);
               const cy = n.y + n.h / 2 - (lineB ? 6 : 0);
+              const action = actions.find((a) => a.id === actId);
+              const tooltip =
+                action?.wargame_note && action.wargame_note.length > 0
+                  ? `${action.name}: ${action.wargame_note}`
+                  : action?.name ?? n.label;
               return (
                 <g key={n.id} pointerEvents="all">
+                  <title>{tooltip}</title>
                   <rect
                     x={n.x}
                     y={n.y}

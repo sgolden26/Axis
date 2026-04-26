@@ -460,6 +460,7 @@ class ScenarioBuilder:
         intensity: float,
         deadline_turn: int | None = None,
         drivers: tuple[str, ...] = (),
+        team_goal: str | None = None,
     ) -> Self:
         self._faction_pressures.append(
             FactionPressure(
@@ -467,6 +468,7 @@ class ScenarioBuilder:
                 intensity=intensity,
                 deadline_turn=deadline_turn,
                 drivers=drivers,
+                team_goal=team_goal,
             )
         )
         return self

@@ -47,6 +47,10 @@ export const factionPressureSchema = z.object({
   intensity: z.number().min(0).max(1),
   deadline_turn: z.number().int().nullable().optional(),
   drivers: z.array(z.string()).default([]),
+  // NATO Wargaming Handbook (HQ SACT, 2023) Fig. 7: time-bound team goal
+  // expressed as a verb phrase ending in its preposition ("...by" / "...through").
+  // The HUD appends the live `T-N` countdown.
+  team_goal: z.string().nullable().optional(),
 });
 export type FactionPressure = z.infer<typeof factionPressureSchema>;
 

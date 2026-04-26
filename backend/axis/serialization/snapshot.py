@@ -517,6 +517,8 @@ class SnapshotExporter:
         }
         if fp.deadline_turn is not None:
             out["deadline_turn"] = fp.deadline_turn
+        if fp.team_goal is not None:
+            out["team_goal"] = fp.team_goal
         return out
 
     @staticmethod

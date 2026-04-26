@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAppStore } from "@/state/store";
 import { evaluate } from "@/decision/evaluator";
+import { buildPoliticalContext } from "@/decision/politicalContext";
 import type { Action } from "@/types/decision";
+import { DecisionContextPanel } from "./DecisionContextPanel";
 import { DecisionStatusBadge } from "./DecisionStatusBadge";
 import { FactorFlowGraph } from "./FactorFlowGraph";
 import { OutcomeCard } from "./OutcomeCard";
@@ -22,10 +24,52 @@ export function DecisionImmersive() {
   const select = useAppStore((s) => s.select);
   const selectedActionId = useAppStore((s) => s.selectedActionId);
   const selectAction = useAppStore((s) => s.selectAction);
+  const playerTeam = useAppStore((s) => s.playerTeam);
 
   /** Bottom outcome is shown only after the user picks an action in this session. */
   const [choseAction, setChoseAction] = useState(false);
   const onClose = useCallback(() => setImmersive(false), [setImmersive]);
+
+  /**
+   * User-resizable height for the outcome panel. Default null = falls back to
+   * 42vh (parity with the previous static cap). Drag the divider between the
+   * top region/graph row and the bottom panel to grow it toward full screen.
+   */
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+  const [bottomHeight, setBottomHeight] = useState<number | null>(null);
+  const draggingRef = useRef(false);
+
+  const startBottomDrag = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    draggingRef.current = true;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "ns-resize";
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!draggingRef.current) return;
+      const el = splitContainerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const next = rect.bottom - e.clientY;
+      const min = 120;
+      const max = Math.max(min, rect.height - 96);
+      setBottomHeight(Math.max(min, Math.min(max, next)));
+    };
+    const onUp = () => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+  }, []);
 
   const onActionPick = useCallback(
     (id: string) => {
@@ -81,15 +125,21 @@ export function DecisionImmersive() {
     [actions, selectedActionId],
   );
 
-  const outcome = useMemo(() => {
-    if (!choseAction || !selectedAction || !focusedRegion) return null;
-    return evaluate(selectedAction, focusedRegion);
-  }, [choseAction, selectedAction, focusedRegion]);
-
   const resolvedEntity = useMemo(() => {
     if (!scenario || !focusedRegion) return null;
     return resolveRegionEntity(scenario, focusedRegion.region_id);
   }, [scenario, focusedRegion]);
+
+  const politicalContext = useMemo(() => {
+    if (!scenario) return undefined;
+    const targetId = resolvedEntity?.faction?.id ?? null;
+    return buildPoliticalContext(scenario, playerTeam, targetId);
+  }, [scenario, playerTeam, resolvedEntity]);
+
+  const outcome = useMemo(() => {
+    if (!choseAction || !selectedAction || !focusedRegion) return null;
+    return evaluate(selectedAction, focusedRegion, politicalContext);
+  }, [choseAction, selectedAction, focusedRegion, politicalContext]);
 
   if (!open || tab !== "decision") return null;
 
@@ -142,7 +192,7 @@ export function DecisionImmersive() {
             )}
           </div>
         ) : (
-          <div className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
+          <div ref={splitContainerRef} className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
             <div className="flex h-0 min-h-0 flex-1 flex-row gap-0 overflow-hidden">
               <div className="w-[220px] shrink-0 overflow-y-auto border-r border-ink-600 bg-ink-800/80">
                 <RegionList
@@ -175,13 +225,48 @@ export function DecisionImmersive() {
               </div>
             </div>
 
-            {outcome && (
-              <div className="hairline-t max-h-[38vh] shrink-0 overflow-y-auto border-ink-600 bg-ink-800/95 px-2 py-2">
-                <div className="font-mono text-[9px] uppercase tracking-wider2 text-ink-300">
-                  if you take “{selectedAction?.name}”
+            {outcome && scenario && resolvedEntity && (
+              <>
+                <div
+                  role="separator"
+                  aria-orientation="horizontal"
+                  aria-label="Resize outcome panel"
+                  onMouseDown={startBottomDrag}
+                  className="group flex h-3 shrink-0 cursor-ns-resize flex-col items-center justify-center gap-[3px] border-y border-ink-500 bg-ink-600 hover:bg-ink-500"
+                  title="Drag to resize"
+                >
+                  <div className="h-0.5 w-20 rounded-full bg-ink-200 group-hover:bg-ink-50" />
+                  <div className="h-0.5 w-20 rounded-full bg-ink-200 group-hover:bg-ink-50" />
                 </div>
-                <OutcomeCard outcome={outcome} />
-              </div>
+                <div
+                  className="shrink-0 overflow-y-auto border-ink-600 bg-ink-800/95"
+                  style={{ height: bottomHeight ?? "42vh" }}
+                >
+                  <div className="px-5 pt-3">
+                    <div className="font-mono text-[12px] font-semibold uppercase tracking-wider2 text-ink-100">
+                      if you take “{selectedAction?.name}”
+                    </div>
+                  </div>
+                  <DecisionContextPanel
+                    scenario={scenario}
+                    playerTeam={playerTeam}
+                    political={politicalContext ?? {}}
+                    targetFaction={resolvedEntity.faction}
+                    selectedAction={selectedAction}
+                    size="comfortable"
+                  />
+                  <div className="px-2 pb-3">
+                    <OutcomeCard
+                      outcome={outcome}
+                      expandable
+                      region={focusedRegion}
+                      team={playerTeam}
+                      actionId={selectedAction?.id}
+                      size="comfortable"
+                    />
+                  </div>
+                </div>
+              </>
             )}
             {!outcome && actions.length > 0 && !choseAction && (
               <div className="hairline-t border-ink-600 bg-ink-800/60 px-4 py-2 font-mono text-[10px] text-ink-300">

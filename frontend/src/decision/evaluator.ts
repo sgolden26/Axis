@@ -99,6 +99,8 @@ export function evaluate(
       label: categoryLabel(d.category, d.contribution),
       kind: "category",
       delta,
+      key: `cat:${d.category}`,
+      source: "intel",
     });
   }
 
@@ -121,14 +123,30 @@ export function evaluate(
   const probability = clamp(raw, P_FLOOR, P_CEIL);
 
   const breakdown: BreakdownItem[] = [
-    { label: "base rate", kind: "base", delta: action.base_rate },
-    { label: moraleLabel(moraleNorm), kind: "modifier", delta: pMorale },
+    {
+      label: "base rate",
+      kind: "base",
+      delta: action.base_rate,
+      key: "base",
+      source: "base",
+    },
+    {
+      label: moraleLabel(moraleNorm),
+      kind: "modifier",
+      delta: pMorale,
+      key: "morale",
+      source: "intel",
+      detail: `morale_norm × ${action.morale_weight.toFixed(2)} (morale weight)`,
+    },
   ];
   if (Math.abs(pTrend) >= SIGNIFICANT_DELTA) {
     breakdown.push({
       label: `${region.morale_trend} trend`,
       kind: "modifier",
       delta: pTrend,
+      key: "trend",
+      source: "intel",
+      detail: `trend × ${action.trend_weight.toFixed(2)} (trend weight)`,
     });
   }
   if (Math.abs(pSeverity) >= SIGNIFICANT_DELTA) {
@@ -136,17 +154,40 @@ export function evaluate(
       label: "recent event severity",
       kind: "modifier",
       delta: pSeverity,
+      key: "severity",
+      source: "intel",
+      detail: `net severity norm × ${action.severity_weight.toFixed(2)} (severity weight)`,
     });
   }
   breakdown.push(...categoryItems);
   if (Math.abs(pPressure) >= SIGNIFICANT_DELTA && pressureLabel) {
-    breakdown.push({ label: pressureLabel, kind: "modifier", delta: pPressure });
+    const bias = action.pressure_aggression_bias ?? 0;
+    const p = political?.issuer_pressure;
+    breakdown.push({
+      label: pressureLabel,
+      kind: "modifier",
+      delta: pPressure,
+      key: "pressure",
+      source: "pressure",
+      detail:
+        p != null
+          ? `${bias.toFixed(2)} (aggression bias) × ${p.toFixed(2)} (issuer pressure)`
+          : undefined,
+    });
   }
   if (Math.abs(pCredibility) >= SIGNIFICANT_DELTA && credibilityLabel) {
+    const w = action.credibility_weight ?? 0;
+    const imm = political?.bilateral_credibility_immediate;
     breakdown.push({
       label: credibilityLabel,
       kind: "modifier",
       delta: pCredibility,
+      key: "credibility",
+      source: "credibility",
+      detail:
+        imm != null
+          ? `${w.toFixed(2)} (cred. weight) × ${imm.toFixed(2)} (immediate, issuer→target)`
+          : undefined,
     });
   }
 

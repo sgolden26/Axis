@@ -803,11 +803,16 @@ def _add_political(b: ScenarioBuilder) -> None:
     b.with_current_turn(0)
     b.with_global_deadline(12)  # 12-turn campaign window
 
-    # Per-faction pressure (derived rollup; sim hook recomputes each turn).
+    # Per-faction pressure + team goals.
+    # Team-goal framing follows the NATO Wargaming Handbook (HQ SACT, 2023)
+    # Fig. 7: time-bound, single-sentence player goals tied to a turn target.
+    # `intensity` is the friction the team faces against that goal; the sim
+    # hook recomputes it each turn from regions + deadline ramp.
     b.add_faction_pressure(
         faction_id="ru",
         intensity=0.62,
         deadline_turn=8,
+        team_goal="stabilise mobilisation by",
         drivers=(
             "mobilisation backlog",
             "energy revenue volatility",
@@ -818,6 +823,7 @@ def _add_political(b: ScenarioBuilder) -> None:
         faction_id="ua",
         intensity=0.74,
         deadline_turn=6,
+        team_goal="secure aid tranche by",
         drivers=(
             "Western aid window narrowing",
             "manpower replenishment shortfall",
@@ -828,6 +834,7 @@ def _add_political(b: ScenarioBuilder) -> None:
         faction_id="nato",
         intensity=0.35,
         deadline_turn=10,
+        team_goal="hold alliance unity through",
         drivers=("alliance unity messaging", "domestic election cycles"),
     )
 

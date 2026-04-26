@@ -118,7 +118,13 @@ def serve(
 
     The FE expects this on localhost:8000 and proxies `/api/*` to it during
     `npm run dev`. Holds the theatre in memory; orders mutate that state.
+
+    Auto-loads environment variables from `backend/.env` (and any `.env`
+    walked up from cwd) so secrets like `OPENAI_API_KEY` do not have to be
+    exported manually.
     """
+    _load_dotenv_for_serve()
+
     import uvicorn  # local import keeps `axis export` cheap to start
 
     uvicorn.run(
@@ -128,6 +134,22 @@ def serve(
         reload=reload,
         log_level="info",
     )
+
+
+def _load_dotenv_for_serve() -> None:
+    """Load `.env` from cwd and from `backend/.env` next to the package.
+
+    Idempotent and silent. Existing OS env vars win over file values so
+    operators can still override per-shell.
+    """
+    try:
+        from dotenv import find_dotenv, load_dotenv
+    except ImportError:
+        return
+    load_dotenv(find_dotenv(usecwd=True), override=False)
+    backend_env = Path(__file__).resolve().parents[1] / ".env"
+    if backend_env.exists():
+        load_dotenv(backend_env, override=False)
 
 
 @intel_app.command("export")
