@@ -20,7 +20,7 @@ Axis is a hackathon entry for the SCSP Hackathon 2026 wargaming track. The aim i
 - `frontend/public/borders/` static Natural Earth GeoJSON: admin-0 primary (RU/UA/BY/PL/MD/RO/GE), admin-0 context ring, admin-1 Ukrainian oblasts + Crimea/Sevastopol.
 - `frontend/src/map/` MapLibre wrapper, layer modules per kind (territory, cities, units, oblast, country, asset, coverage, frontline, supply), `mapRef.ts` singleton, and `geo.ts` geospatial primitives.
 - `frontend/src/ui/` HUD, `LeftDock` (FilterChips + OOBTree), `RightPanel` (Context tab / Decision tab: docked `DecisionEngine` plus full-screen `DecisionImmersive` with a client-built factor flow graph from `intel` + outcome estimate), CountryRoster, Bottom bar (MeasureTool, Bookmarks, EventTicker), Minimap, HoverCard, KeyboardShortcuts. Sidebar holds the per-kind detail panels for every selectable entity (city, unit, territory, country, oblast, depot, airfield, naval base, crossing, supply, ISR, missile, AOR, frontline).
-- `frontend/src/state/store.ts` Zustand store (selection, hover, visible layers, right tab, left/right panel open, `decisionImmersiveOpen`, OOB expansion, bookmarks, measure path, ticker pause, help overlay, choropleth metric).
+- `frontend/src/state/store.ts` Zustand store (selection, hover, visible layers, right tab, left/right panel open, `decisionImmersiveOpen`, OOB expansion, bookmarks, measure path, ticker pause, help overlay, choropleth metric, `playerTeam` red/blue for future order gating). `frontend/src/state/playerTeam.ts` exports `PlayerTeam` and `isFactionControllableByPlayerTeam` vs `Faction.allegiance`.
 - `frontend/src/types/` Zod schemas mirroring the Python models (`scenario.ts`, `country.ts`, `oblast.ts`, `frontline.ts`, `military_assets.ts`).
 
 ## Status

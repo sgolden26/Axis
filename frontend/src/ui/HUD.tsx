@@ -29,14 +29,19 @@ export function HUD() {
         </div>
       </div>
 
-      <div className="hairline-l flex flex-1 items-center justify-center gap-6 px-6 font-mono text-[10px] uppercase tracking-wider2 text-ink-100">
-        <span className="text-accent-amber">
-          {scenario?.scenario.classification ?? "UNCLASSIFIED // EXERCISE"}
-        </span>
-        <span className="text-ink-300">|</span>
-        <span>scenario · {scenario?.scenario.name ?? "—"}</span>
-        <span className="text-ink-300">|</span>
-        <span>clock · {scenario?.scenario.clock.replace("T", " ").slice(0, 16) ?? "—"}</span>
+      <div className="hairline-l flex min-w-0 flex-1 items-stretch">
+        <div className="hairline-r flex shrink-0 items-center px-3">
+          <TeamBar />
+        </div>
+        <div className="flex min-w-0 flex-1 items-center justify-center gap-6 px-6 font-mono text-[10px] uppercase tracking-wider2 text-ink-100">
+          <span className="text-accent-amber">
+            {scenario?.scenario.classification ?? "UNCLASSIFIED // EXERCISE"}
+          </span>
+          <span className="text-ink-300">|</span>
+          <span>scenario · {scenario?.scenario.name ?? "—"}</span>
+          <span className="text-ink-300">|</span>
+          <span>clock · {scenario?.scenario.clock.replace("T", " ").slice(0, 16) ?? "—"}</span>
+        </div>
       </div>
 
       <div className="hairline-l flex items-center gap-4 px-4 font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
@@ -52,6 +57,69 @@ export function HUD() {
         <span>v{__schemaSummary(scenario?.schema_version, intel?.intel_schema_version)}</span>
       </div>
     </header>
+  );
+}
+
+function TeamBar() {
+  const team = useAppStore((s) => s.playerTeam);
+  const setTeam = useAppStore((s) => s.setPlayerTeam);
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Player team"
+      className="inline-flex h-7 items-stretch hairline"
+    >
+      <TeamBarOption
+        label="blue team"
+        selected={team === "blue"}
+        onSelect={() => setTeam("blue")}
+        className="border-r border-ink-500/40"
+        activeClassName="text-faction-nato bg-ink-700/90"
+        idleClassName="text-ink-200 hover:text-faction-nato/90"
+        title="Play as blue-side (NATO / allied) forces"
+      />
+      <TeamBarOption
+        label="red team"
+        selected={team === "red"}
+        onSelect={() => setTeam("red")}
+        activeClassName="text-faction-ru bg-ink-700/90"
+        idleClassName="text-ink-200 hover:text-faction-ru/90"
+        title="Play as red-side forces"
+      />
+    </div>
+  );
+}
+
+function TeamBarOption({
+  label,
+  selected,
+  onSelect,
+  className: wrapClass = "",
+  activeClassName,
+  idleClassName,
+  title: tip,
+}: {
+  label: string;
+  selected: boolean;
+  onSelect: () => void;
+  className?: string;
+  activeClassName: string;
+  idleClassName: string;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      title={tip}
+      onClick={onSelect}
+      className={`min-w-[5.5rem] px-2.5 font-mono text-[9px] uppercase tracking-wider2 transition-colors ${
+        selected ? activeClassName : idleClassName
+      } ${wrapClass}`}
+    >
+      {label}
+    </button>
   );
 }
 

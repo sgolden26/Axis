@@ -6,6 +6,7 @@ import type {
 } from "@/types/scenario";
 import type { ChoroplethMetric } from "@/types/country";
 import type { IntelSnapshot, RegionIntel } from "@/types/intel";
+import type { PlayerTeam } from "@/state/playerTeam";
 
 export type LayerKey =
   | "oblasts"
@@ -87,6 +88,9 @@ interface AppState {
   tickerPaused: boolean;
   showHelp: boolean;
 
+  /** Adjudicated side for upcoming move / order affordances. */
+  playerTeam: PlayerTeam;
+
   setScenario: (s: ScenarioSnapshot) => void;
   setLoadError: (e: string | null) => void;
   setIntel: (snapshot: IntelSnapshot) => void;
@@ -114,6 +118,7 @@ interface AppState {
   clearMeasure: () => void;
   setTickerPaused: (p: boolean) => void;
   setShowHelp: (on: boolean) => void;
+  setPlayerTeam: (t: PlayerTeam) => void;
   intelByRegion: () => Map<string, RegionIntel>;
 }
 
@@ -157,6 +162,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   measurePath: [],
   tickerPaused: false,
   showHelp: false,
+  playerTeam: "blue",
 
   setScenario: (s) =>
     set((state) => ({
@@ -234,6 +240,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearMeasure: () => set({ measurePath: [] }),
   setTickerPaused: (p) => set({ tickerPaused: p }),
   setShowHelp: (on) => set({ showHelp: on }),
+  setPlayerTeam: (t) => set({ playerTeam: t }),
   intelByRegion: () => {
     const intel = get().intel;
     const out = new Map<string, RegionIntel>();
