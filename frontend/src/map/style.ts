@@ -44,11 +44,14 @@ export const baseStyle: StyleSpecification = {
         "raster-brightness-max": 0.75,
       },
     },
+    // World_Boundaries_and_Places is a single composite; we cannot drop only text
+    // from it. Opacity 0 silences basemap place names and reference lines; country /
+    // oblast / city labels come from Axis vector layers and layer toggles.
     {
       id: "esri-reference",
       type: "raster",
       source: "esri-reference",
-      paint: { "raster-opacity": 0.7 },
+      paint: { "raster-opacity": 0.8 },
     },
   ],
 };

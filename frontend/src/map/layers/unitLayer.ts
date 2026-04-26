@@ -1,4 +1,4 @@
-import type { LayerSpecification } from "maplibre-gl";
+import type { LayerSpecification, Map as MlMap } from "maplibre-gl";
 import type { Faction, Unit } from "@/types/scenario";
 import {
   LAYER_UNIT_DOT,
@@ -33,6 +33,68 @@ const DOMAIN_RANK: Record<Unit["domain"], number> = {
   air: 2,
   naval: 3,
 };
+
+const DOMAINS: Unit["domain"][] = ["ground", "air", "naval"];
+
+const ICON_PX = 40;
+const ICON_PAD = 5;
+const ICON_STROKE = "#0b0f14";
+
+function unitIconId(domain: Unit["domain"], factionId: string): string {
+  return `axis-unit-${domain}-${factionId}`;
+}
+
+function drawShape(
+  ctx: CanvasRenderingContext2D,
+  domain: Unit["domain"],
+  size: number,
+  pad: number,
+) {
+  ctx.beginPath();
+  if (domain === "ground") {
+    ctx.rect(pad, pad, size - 2 * pad, size - 2 * pad);
+  } else if (domain === "air") {
+    ctx.moveTo(size / 2, pad);
+    ctx.lineTo(size - pad, size - pad);
+    ctx.lineTo(pad, size - pad);
+    ctx.closePath();
+  } else {
+    ctx.moveTo(size / 2, pad);
+    ctx.lineTo(size - pad, size / 2);
+    ctx.lineTo(size / 2, size - pad);
+    ctx.lineTo(pad, size / 2);
+    ctx.closePath();
+  }
+}
+
+/**
+ * Renders each (domain, faction) pair to an offscreen canvas and registers it
+ * with the map as an icon sprite. Faction-tinted fills and a dark hairline
+ * stroke are baked in; the layer just selects by id at draw time. Idempotent
+ * via `hasImage`, so safe to call on every scenario reload.
+ */
+export function registerUnitIcons(map: MlMap, factions: Faction[]) {
+  for (const faction of factions) {
+    for (const domain of DOMAINS) {
+      const id = unitIconId(domain, faction.id);
+      if (map.hasImage(id)) continue;
+      const canvas = document.createElement("canvas");
+      canvas.width = ICON_PX;
+      canvas.height = ICON_PX;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) continue;
+      ctx.clearRect(0, 0, ICON_PX, ICON_PX);
+      ctx.fillStyle = faction.color ?? "#cccccc";
+      ctx.strokeStyle = ICON_STROKE;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "miter";
+      drawShape(ctx, domain, ICON_PX, ICON_PAD);
+      ctx.fill();
+      ctx.stroke();
+      map.addImage(id, ctx.getImageData(0, 0, ICON_PX, ICON_PX));
+    }
+  }
+}
 
 export function unitFeatureCollection(
   units: Unit[],
@@ -75,30 +137,35 @@ export const unitHaloLayer: LayerSpecification = {
 };
 
 /**
- * Faction-coloured disc with a dark hairline stroke. Sized so the centred glyph
- * label reads at a glance even at low zoom.
+ * Domain-coded shape (square = ground, triangle = air, diamond = naval),
+ * pulled from the per-faction icon sprites registered by `registerUnitIcons`.
+ * Selection bumps icon-size; hover/select glow comes from the halo circle.
  */
 export const unitDotLayer: LayerSpecification = {
   id: LAYER_UNIT_DOT,
-  type: "circle",
+  type: "symbol",
   source: SOURCE_UNITS,
-  paint: {
-    "circle-color": ["get", "color"],
-    "circle-stroke-color": "#0b0f14",
-    "circle-stroke-width": [
-      "case",
-      ["boolean", ["feature-state", "selected"], false], 2.5,
-      1.4,
+  layout: {
+    "icon-image": [
+      "concat",
+      "axis-unit-",
+      ["get", "domain"],
+      "-",
+      ["get", "faction_id"],
     ],
-    "circle-radius": [
+    "icon-size": [
       "interpolate",
       ["linear"],
       ["zoom"],
-      3, 7,
-      6, 10,
-      8, 13,
+      3, 0.45,
+      6, 0.65,
+      8, 0.85,
     ],
-    "circle-opacity": 0.97,
+    "icon-allow-overlap": true,
+    "icon-ignore-placement": true,
+  },
+  paint: {
+    "icon-opacity": 0.97,
   },
 };
 
@@ -116,6 +183,14 @@ export const unitGlyphLayer: LayerSpecification = {
       3, 9,
       6, 11,
       8, 14,
+    ],
+    // Triangle's optical centre sits below its em-box centre; nudge the letter
+    // down on air units so it reads as inside the shape rather than floating.
+    "text-offset": [
+      "match",
+      ["get", "domain"],
+      "air", ["literal", [0, 0.18]],
+      ["literal", [0, 0]],
     ],
     "text-allow-overlap": true,
     "text-ignore-placement": true,

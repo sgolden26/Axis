@@ -25,6 +25,7 @@ import {
   cityLabelLayer,
 } from "./layers/cityLayer";
 import {
+  registerUnitIcons,
   unitDotLayer,
   unitFeatureCollection,
   unitGlyphLayer,
@@ -119,6 +120,15 @@ const ASSET_KIND_TO_SELECTABLE: Record<string, SelectableKind> = {
   border_crossing: "border_crossing",
 };
 
+/**
+ * Initial theatre framing. Reused as the "selection-fly" floor for any feature
+ * (country, frontline, supply line) whose true bbox would force us to zoom
+ * further out than this; in that case we re-frame to the original Russia/Ukraine
+ * theatre view rather than producing a globe-wide camera with an off-screen centre.
+ */
+const INITIAL_CENTER: Pos = [33.0, 48.5];
+const INITIAL_ZOOM = 4.6;
+
 export function MapView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
@@ -148,8 +158,8 @@ export function MapView() {
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: baseStyle,
-      center: [33.0, 48.5],
-      zoom: 4.6,
+      center: INITIAL_CENTER,
+      zoom: INITIAL_ZOOM,
       attributionControl: { compact: true },
       hash: false,
     });
@@ -368,23 +378,56 @@ function bboxOfRing(coords: Pos[]): [number, number, number, number] {
   return [minLon, minLat, maxLon, maxLat];
 }
 
+/**
+ * Antimeridian-aware ring bbox. Russia and a few other features have rings on
+ * both sides of ±180°; the naive min/max gives a globe-spanning bbox centred at
+ * lon=0. We detect any consecutive longitude jump > 180° as antimeridian crossing
+ * and shift negative longitudes by +360 so the ring lives in [0, 360+]. MapLibre
+ * wraps the resulting centre back into [-180, 180].
+ */
+function bboxOfRingWrapped(coords: Pos[]): [number, number, number, number] {
+  if (coords.length === 0) return bboxOfRing(coords);
+  let crosses = false;
+  for (let i = 1; i < coords.length; i++) {
+    if (Math.abs(coords[i][0] - coords[i - 1][0]) > 180) {
+      crosses = true;
+      break;
+    }
+  }
+  if (!crosses) return bboxOfRing(coords);
+  const shifted: Pos[] = coords.map(([lon, lat]) => [lon < 0 ? lon + 360 : lon, lat]);
+  return bboxOfRing(shifted);
+}
+
 function bboxFromGeoJson(
   geom: GeoJSON.Geometry | undefined,
 ): [number, number, number, number] | null {
   if (!geom) return null;
   if (geom.type === "Polygon") {
-    return bboxOfRing(geom.coordinates[0] as Pos[]);
+    return bboxOfRingWrapped(geom.coordinates[0] as Pos[]);
   }
   if (geom.type === "MultiPolygon") {
-    let bb: [number, number, number, number] | null = null;
-    for (const poly of geom.coordinates) {
-      const inner = bboxOfRing(poly[0] as Pos[]);
-      bb = bb ? mergeBbox(bb, inner) : inner;
-    }
-    return bb;
+    // Each ring is locally compact, but Russia (and a few others) split across
+    // the antimeridian as a separate polygon at the far-negative side. Naive
+    // merge produces a globe-spanning bbox centred at lon=0. Detect this by
+    // total longitude span; if > 180, shift any all-negative-lon polygon's
+    // ring by +360 so all rings live in a contiguous [0, 360+] band.
+    const perRing = geom.coordinates.map((poly) => bboxOfRingWrapped(poly[0] as Pos[]));
+    const merged = perRing.reduce<[number, number, number, number] | null>(
+      (acc, b) => (acc ? mergeBbox(acc, b) : b),
+      null,
+    );
+    if (!merged) return null;
+    const span = merged[2] - merged[0];
+    if (span <= 180) return merged;
+    const shifted = perRing.map((b) => (b[2] < 0 ? ([b[0] + 360, b[1], b[2] + 360, b[3]] as [number, number, number, number]) : b));
+    return shifted.reduce<[number, number, number, number] | null>(
+      (acc, b) => (acc ? mergeBbox(acc, b) : b),
+      null,
+    );
   }
   if (geom.type === "LineString") {
-    return bboxOfRing(geom.coordinates as Pos[]);
+    return bboxOfRingWrapped(geom.coordinates as Pos[]);
   }
   return null;
 }
@@ -413,14 +456,23 @@ function flyToSelection(
   const easeToPoint = (pos: Pos, zoom = 7.2) =>
     map.easeTo({ center: pos, zoom: Math.max(zoom, map.getZoom()), duration: 600 });
 
-  const fit = (bb: [number, number, number, number]) =>
-    map.fitBounds(
-      [
-        [bb[0], bb[1]],
-        [bb[2], bb[3]],
-      ],
-      { ...easeOpts, maxZoom: 7 },
-    );
+  // For bbox-driven framings: ask MapLibre what zoom this bbox would need.
+  // If it's wider than the theatre view (Russia, etc.) we don't try to fit
+  // the whole thing — that produces a useless zoomed-right-out view with the
+  // padding-shifted centre well off the country. Instead we ease back to the
+  // original theatre framing, which the user already recognises as "the map".
+  const fit = (bb: [number, number, number, number]) => {
+    const bounds: [[number, number], [number, number]] = [
+      [bb[0], bb[1]],
+      [bb[2], bb[3]],
+    ];
+    const cam = map.cameraForBounds(bounds, { padding });
+    if (cam && typeof cam.zoom === "number" && cam.zoom < INITIAL_ZOOM) {
+      map.easeTo({ center: INITIAL_CENTER, zoom: INITIAL_ZOOM, duration: 600 });
+      return;
+    }
+    map.fitBounds(bounds, { ...easeOpts, maxZoom: 7 });
+  };
 
   switch (selection.kind) {
     case "city": {
@@ -450,19 +502,20 @@ function flyToSelection(
       return;
     }
     case "oblast": {
+      // Oblasts behave like point selections: ease straight in to a centroid.
+      // fitBounds gets pathological when the side panels eat ~740px of a 1024
+      // viewport, and feels jerky for the user.
       const o = scenario.oblasts.find((x) => x.id === selection.id);
       if (!o) return;
-      if (borders) {
+      let centre: Pos | null = o.centroid ?? null;
+      if (!centre && borders) {
         const f = borders.admin1Ua.features.find(
           (x) => x.properties.iso_3166_2 === o.iso_3166_2,
         );
         const bb = bboxFromGeoJson(f?.geometry);
-        if (bb) {
-          fit(bb);
-          return;
-        }
+        if (bb) centre = [(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2];
       }
-      if (o.centroid) easeToPoint(o.centroid, 6);
+      if (centre) easeToPoint(centre, 6.5);
       return;
     }
     case "country": {
@@ -536,6 +589,10 @@ function addOrUpdateData(
   upsertGeoJsonSource(map, SOURCE_CITIES, withStringIds(cities));
   upsertGeoJsonSource(map, SOURCE_UNITS, withStringIds(units));
   upsertGeoJsonSource(map, SOURCE_ASSETS, withStringIds(assets));
+
+  // Per-(domain x faction) icon sprites must exist before unitDotLayer is
+  // added; the layer's icon-image expression resolves to one of these ids.
+  registerUnitIcons(map, scenario.factions);
 
   // Layer order: bottom -> top.
   addLayerOnce(map, contextFillLayer);
