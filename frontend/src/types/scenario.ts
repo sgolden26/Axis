@@ -1,6 +1,18 @@
 import { z } from "zod";
 import { actionSchema } from "./decision";
 import { countrySchema } from "./country";
+import { oblastSchema } from "./oblast";
+import { frontlineSchema } from "./frontline";
+import {
+  airfieldSchema,
+  aorSchema,
+  borderCrossingSchema,
+  depotSchema,
+  isrCoverageSchema,
+  missileRangeSchema,
+  navalBaseSchema,
+  supplyLineSchema,
+} from "./military_assets";
 
 export const allegianceSchema = z.enum(["blue", "red", "neutral"]);
 export type Allegiance = z.infer<typeof allegianceSchema>;
@@ -85,18 +97,53 @@ export const scenarioSnapshotSchema = z.object({
   countries: z.array(countrySchema).default([]),
   cities: z.array(citySchema),
   territories: z.array(territorySchema),
+  oblasts: z.array(oblastSchema).default([]),
   units: z.array(unitSchema),
+  depots: z.array(depotSchema).default([]),
+  airfields: z.array(airfieldSchema).default([]),
+  naval_bases: z.array(navalBaseSchema).default([]),
+  border_crossings: z.array(borderCrossingSchema).default([]),
+  supply_lines: z.array(supplyLineSchema).default([]),
+  isr_coverages: z.array(isrCoverageSchema).default([]),
+  missile_ranges: z.array(missileRangeSchema).default([]),
+  aors: z.array(aorSchema).default([]),
+  frontlines: z.array(frontlineSchema).default([]),
   actions: z.array(actionSchema).default([]),
 });
 export type ScenarioSnapshot = z.infer<typeof scenarioSnapshotSchema>;
 
-export type SelectableKind = "city" | "territory" | "unit" | "country";
+export type SelectableKind =
+  | "city"
+  | "territory"
+  | "unit"
+  | "country"
+  | "oblast"
+  | "depot"
+  | "airfield"
+  | "naval_base"
+  | "border_crossing"
+  | "supply_line"
+  | "isr_coverage"
+  | "missile_range"
+  | "aor"
+  | "frontline";
 
-export type Selection =
-  | { kind: "city"; id: string }
-  | { kind: "territory"; id: string }
-  | { kind: "unit"; id: string }
-  | { kind: "country"; id: string }
-  | null;
+export type Selection = { kind: SelectableKind; id: string } | null;
 
+export type {
+  Aor,
+  Airfield,
+  BorderCrossing,
+  CrossingMode,
+  Depot,
+  IsrCoverage,
+  IsrPlatform,
+  MissileCategory,
+  MissileRange,
+  NavalBase,
+  SupplyLine,
+  SupplyLineMode,
+} from "./military_assets";
+export type { Frontline } from "./frontline";
+export type { Oblast } from "./oblast";
 export type { Country } from "./country";

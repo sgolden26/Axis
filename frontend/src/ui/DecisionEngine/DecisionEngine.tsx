@@ -54,7 +54,7 @@ export function DecisionEngine() {
   }, [selectedAction, focusedRegion]);
 
   return (
-    <aside className="hairline-l flex h-full w-[400px] flex-col bg-ink-800">
+    <div className="flex h-full flex-col bg-ink-800">
       <div className="hairline-b flex items-center justify-between px-4 py-2">
         <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
           decision engine
@@ -88,7 +88,11 @@ export function DecisionEngine() {
               territoriesById={territoriesById}
               factionsById={factionsById}
               selectedRegionId={focusedRegionId}
-              onSelect={(id) => select({ kind: "territory", id })}
+              onSelect={(id) => {
+                const oblast = scenario?.oblasts.find((o) => o.id === id);
+                if (oblast) select({ kind: "oblast", id });
+                else select({ kind: "territory", id });
+              }}
             />
 
             {focusedRegion && territoriesById.get(focusedRegion.region_id) && (
@@ -115,7 +119,7 @@ export function DecisionEngine() {
           </>
         )}
       </div>
-    </aside>
+    </div>
   );
 }
 

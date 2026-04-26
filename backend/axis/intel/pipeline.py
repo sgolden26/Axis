@@ -137,10 +137,25 @@ def build_source(
 
 
 def default_region_ids() -> Iterable[str]:
-    """Region ids the eastern_europe scenario expects intel for."""
+    """Region ids the eastern_europe scenario expects intel for.
+
+    The Russia-Ukraine theatre seeds 27 Ukrainian admin-1 oblasts plus a few
+    contested territory shells. We watch a selection of frontline / strategic
+    oblasts and the headline territory shells.
+    """
     return (
-        "terr.lithuania",
-        "terr.poland_ne",
-        "terr.kaliningrad",
-        "terr.belarus_w",
+        "obl.30",   # Kyiv City
+        "obl.63",   # Kharkiv
+        "obl.14",   # Donetsk
+        "obl.09",   # Luhansk
+        "obl.23",   # Zaporizhzhia
+        "obl.65",   # Kherson
+        "obl.51",   # Odesa
+        "obl.43",   # AR Crimea
+        "obl.59",   # Sumy
+        "obl.74",   # Chernihiv
+        "terr.donbas-occ",
+        "terr.crimea-occ",
+        "terr.south-occ",
+        "terr.ukraine-free",
     )

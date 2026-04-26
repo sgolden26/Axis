@@ -193,6 +193,7 @@ class RelationStatus(str, Enum):
     NEUTRAL = "neutral"
     STRAINED = "strained"
     HOSTILE = "hostile"
+    AT_WAR = "at_war"
 
 
 @dataclass(frozen=True, slots=True)

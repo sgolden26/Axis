@@ -1,0 +1,308 @@
+import type {
+  Airfield,
+  Aor,
+  BorderCrossing,
+  Depot,
+  Faction,
+  Frontline,
+  IsrCoverage,
+  MissileRange,
+  NavalBase,
+  SupplyLine,
+} from "@/types/scenario";
+import { SectionHeader } from "./primitives/SectionHeader";
+import { KeyValueRow } from "./primitives/KeyValueRow";
+import { FactionTag } from "./primitives/FactionTag";
+import { MetricBar } from "./primitives/MetricBar";
+
+function Header({
+  kind,
+  name,
+  faction,
+  id,
+}: {
+  kind: string;
+  name: string;
+  faction: Faction;
+  id: string;
+}) {
+  return (
+    <div className="hairline-b px-4 pb-3 pt-4">
+      <div className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+        {kind}
+      </div>
+      <div className="mt-1 text-lg font-semibold text-ink-50">{name}</div>
+      <div className="mt-2 flex items-center gap-2">
+        <FactionTag faction={faction} />
+        <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+          {id}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ActionList({ actions }: { actions: readonly string[] }) {
+  if (actions.length === 0) return null;
+  return (
+    <>
+      <SectionHeader label="available actions" trailing="stub" />
+      <ul className="px-4 py-2 space-y-1">
+        {actions.map((a) => (
+          <li
+            key={a}
+            className="font-mono text-[11px] uppercase tracking-wider2 text-ink-200"
+          >
+            — {a.replace(/_/g, " ")}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+function Pos({ pos }: { pos: [number, number] }) {
+  return (
+    <KeyValueRow
+      label="position"
+      value={`${pos[1].toFixed(3)}°N  ${pos[0].toFixed(3)}°E`}
+    />
+  );
+}
+
+export function DepotDetail({ depot, faction }: { depot: Depot; faction: Faction }) {
+  return (
+    <div className="flex h-full flex-col">
+      <Header kind="logistics depot" name={depot.name} faction={faction} id={depot.id} />
+      <SectionHeader label="metadata" />
+      <Pos pos={depot.position} />
+      <SectionHeader label="metrics" />
+      <MetricBar label="capacity" value={depot.capacity} />
+      <MetricBar label="fill" value={depot.fill} />
+      <ActionList actions={depot.available_actions} />
+    </div>
+  );
+}
+
+export function AirfieldDetail({
+  airfield,
+  faction,
+}: {
+  airfield: Airfield;
+  faction: Faction;
+}) {
+  return (
+    <div className="flex h-full flex-col">
+      <Header
+        kind={`airfield · ${airfield.role}`}
+        name={airfield.name}
+        faction={faction}
+        id={airfield.id}
+      />
+      <SectionHeader label="metadata" />
+      <Pos pos={airfield.position} />
+      <KeyValueRow label="runway" value={`${airfield.runway_m.toLocaleString()} m`} />
+      <KeyValueRow label="based aircraft" value={airfield.based_aircraft} />
+      <ActionList actions={airfield.available_actions} />
+    </div>
+  );
+}
+
+export function NavalDetail({
+  base,
+  faction,
+}: {
+  base: NavalBase;
+  faction: Faction;
+}) {
+  return (
+    <div className="flex h-full flex-col">
+      <Header kind="naval base" name={base.name} faction={faction} id={base.id} />
+      <SectionHeader label="metadata" />
+      <Pos pos={base.position} />
+      <KeyValueRow label="piers" value={base.pier_count} />
+      {base.home_port_for.length > 0 && (
+        <>
+          <SectionHeader label="home port for" trailing={`${base.home_port_for.length}`} />
+          <ul className="px-4 py-2 space-y-1">
+            {base.home_port_for.map((u) => (
+              <li
+                key={u}
+                className="font-mono text-[11px] uppercase tracking-wider2 text-ink-100"
+              >
+                {u}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <ActionList actions={base.available_actions} />
+    </div>
+  );
+}
+
+export function CrossingDetail({
+  crossing,
+  faction,
+}: {
+  crossing: BorderCrossing;
+  faction: Faction;
+}) {
+  return (
+    <div className="flex h-full flex-col">
+      <Header
+        kind={`border crossing · ${crossing.mode}`}
+        name={crossing.name}
+        faction={faction}
+        id={crossing.id}
+      />
+      <SectionHeader label="metadata" />
+      <Pos pos={crossing.position} />
+      <KeyValueRow
+        label="connects"
+        value={`${crossing.countries[0]} ↔ ${crossing.countries[1]}`}
+      />
+      <KeyValueRow
+        label="modes"
+        value={[crossing.road ? "road" : null, crossing.rail ? "rail" : null]
+          .filter(Boolean)
+          .join(" · ") || "—"}
+      />
+      <ActionList actions={crossing.available_actions} />
+    </div>
+  );
+}
+
+export function SupplyDetail({
+  supply,
+  faction,
+}: {
+  supply: SupplyLine;
+  faction: Faction;
+}) {
+  return (
+    <div className="flex h-full flex-col">
+      <Header
+        kind={`supply line · ${supply.mode}`}
+        name={supply.name}
+        faction={faction}
+        id={supply.id}
+      />
+      <SectionHeader label="metadata" />
+      <KeyValueRow label="from" value={supply.from_id ?? "—"} />
+      <KeyValueRow label="to" value={supply.to_id ?? "—"} />
+      <KeyValueRow label="vertices" value={supply.path.length} />
+      <SectionHeader label="metrics" />
+      <MetricBar label="health" value={supply.health} />
+      <ActionList actions={supply.available_actions} />
+    </div>
+  );
+}
+
+export function IsrDetail({
+  isr,
+  faction,
+}: {
+  isr: IsrCoverage;
+  faction: Faction;
+}) {
+  return (
+    <div className="flex h-full flex-col">
+      <Header
+        kind={`ISR · ${isr.platform}`}
+        name={isr.name}
+        faction={faction}
+        id={isr.id}
+      />
+      <SectionHeader label="metadata" />
+      <Pos pos={isr.origin} />
+      <KeyValueRow label="range" value={`${isr.range_km.toLocaleString()} km`} />
+      <KeyValueRow
+        label="heading"
+        value={isr.beam_deg >= 360 ? "omni" : `${Math.round(isr.heading_deg)}°`}
+      />
+      <KeyValueRow label="beam" value={`${Math.round(isr.beam_deg)}°`} />
+      <SectionHeader label="metrics" />
+      <MetricBar label="confidence" value={isr.confidence} />
+      <ActionList actions={isr.available_actions} />
+    </div>
+  );
+}
+
+export function MissileDetail({
+  missile,
+  faction,
+}: {
+  missile: MissileRange;
+  faction: Faction;
+}) {
+  return (
+    <div className="flex h-full flex-col">
+      <Header
+        kind={`missile range · ${missile.category}`}
+        name={missile.name}
+        faction={faction}
+        id={missile.id}
+      />
+      <SectionHeader label="metadata" />
+      <Pos pos={missile.origin} />
+      <KeyValueRow label="weapon" value={missile.weapon} />
+      <KeyValueRow label="range" value={`${missile.range_km.toLocaleString()} km`} />
+      <KeyValueRow
+        label="heading"
+        value={missile.beam_deg >= 360 ? "omni" : `${Math.round(missile.heading_deg)}°`}
+      />
+      <KeyValueRow label="beam" value={`${Math.round(missile.beam_deg)}°`} />
+      <ActionList actions={missile.available_actions} />
+    </div>
+  );
+}
+
+export function AorDetail({
+  aor,
+  faction,
+}: {
+  aor: Aor;
+  faction: Faction;
+}) {
+  return (
+    <div className="flex h-full flex-col">
+      <Header kind="area of responsibility" name={aor.name} faction={faction} id={aor.id} />
+      <SectionHeader label="metadata" />
+      <KeyValueRow label="formation" value={aor.formation_id ?? "—"} />
+      <KeyValueRow label="rings" value={aor.polygon.length} />
+      <ActionList actions={aor.available_actions} />
+    </div>
+  );
+}
+
+export function FrontlineDetail({ frontline }: { frontline: Frontline }) {
+  return (
+    <div className="flex h-full flex-col">
+      <div className="hairline-b px-4 pb-3 pt-4">
+        <div className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+          line of contact
+        </div>
+        <div className="mt-1 text-lg font-semibold text-ink-50">{frontline.name}</div>
+        <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+          {frontline.id}
+        </span>
+      </div>
+      <SectionHeader label="metadata" />
+      <KeyValueRow label="vertices" value={frontline.path.length} />
+      <KeyValueRow label="buffer" value={`${frontline.buffer_km} km`} />
+      {frontline.updated_at && (
+        <KeyValueRow label="updated" value={frontline.updated_at.slice(0, 10)} />
+      )}
+      {frontline.notes && (
+        <>
+          <SectionHeader label="notes" />
+          <div className="px-4 py-3 font-mono text-[11px] leading-relaxed text-ink-100">
+            {frontline.notes}
+          </div>
+        </>
+      )}
+      <ActionList actions={frontline.available_actions} />
+    </div>
+  );
+}

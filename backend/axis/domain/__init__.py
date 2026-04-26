@@ -27,13 +27,31 @@ from axis.domain.country import (
 )
 from axis.domain.faction import Allegiance, Faction
 from axis.domain.city import City, CityImportance
+from axis.domain.frontline import Frontline
+from axis.domain.military_assets import (
+    Airfield,
+    AreaOfResponsibility,
+    AssetKind,
+    BorderCrossing,
+    CrossingMode,
+    Depot,
+    IsrCoverage,
+    MissileRange,
+    NavalBase,
+    SupplyLine,
+)
+from axis.domain.oblast import Oblast
 from axis.domain.territory import Territory
 from axis.domain.theater import Theater
 
 __all__ = [
+    "Airfield",
     "Allegiance",
+    "AreaOfResponsibility",
+    "AssetKind",
     "BilateralRelation",
     "Border",
+    "BorderCrossing",
     "BoundingBox",
     "CabinetMember",
     "City",
@@ -41,23 +59,31 @@ __all__ = [
     "Composition",
     "Coordinate",
     "Country",
+    "CrossingMode",
     "Demographics",
+    "Depot",
     "Diplomacy",
     "EnergyLogistics",
     "Faction",
+    "Frontline",
     "Geography",
     "Government",
     "InventoryLine",
     "InventoryStatus",
+    "IsrCoverage",
     "KeyBase",
     "Military",
     "MilitaryPosture",
+    "MissileRange",
+    "NavalBase",
     "NuclearPosture",
     "NuclearStatus",
+    "Oblast",
     "PublicOpinion",
     "RegimeType",
     "RelationStatus",
     "ServiceBranch",
+    "SupplyLine",
     "Territory",
     "Theater",
     "Treaty",

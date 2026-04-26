@@ -51,6 +51,15 @@ export default {
       boxShadow: {
         glow: "0 0 0 1px rgba(90,169,255,0.5), 0 0 16px rgba(90,169,255,0.25)",
       },
+      keyframes: {
+        ticker: {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+      },
+      animation: {
+        ticker: "ticker 60s linear infinite",
+      },
     },
   },
   plugins: [],

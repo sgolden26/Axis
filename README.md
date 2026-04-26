@@ -4,7 +4,7 @@ A modular wargaming platform combining tactical simulation (troop movement, kine
 
 ## Status
 
-v1: frontend shell with MapLibre theatre map, Python OOP scenario builder, JSON snapshot pipeline, and deeply-modelled country dossiers (government, military, nuclear posture, demographics, diplomacy, energy/logistics, public opinion, geography) wired into the FE as a tabbed dossier panel, choropleth map overlay and roster. Simulation engine and news/intel integration are stubbed for follow-up PRs.
+Schema v0.4.0. Russia/Ukraine theatre with deeply-modelled country dossiers (government, military, nuclear posture, demographics, diplomacy, energy/logistics, public opinion, geography), Ukrainian admin-1 oblasts, ~150 units, depots, airfields, naval bases, supply lines, ISR coverage fans, missile range arcs, areas of responsibility, an animated frontline trace, and border crossings. Maven-style frontend chrome: collapsible left dock with filter chips and OOB tree, right panel with Context and Decision tabs, hover preview cards, bottom event ticker, minimap, measure tool, bookmarks bar, keyboard shortcuts (`[`, `]`, `Esc`, `M`, `B`, `?`). Simulation engine and news/intel integration are stubbed for follow-up PRs.
 
 ## Repo layout
 
@@ -59,4 +59,4 @@ behaviour. The frontend polls `intel.json` and is unchanged.
 
 ## Tracks and scope
 
-Wargaming track. v1 is deliberately small: one scenario (Suwalki gap), four unit types, click-to-select interaction. The architecture is set up for additive PRs.
+Wargaming track. v1 ships a single Russia/Ukraine theatre and four unit types with click-to-select, hover-to-preview, and a full Maven-style chrome. The architecture is set up for additive PRs.

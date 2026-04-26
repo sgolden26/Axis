@@ -1,26 +1,61 @@
 import { create } from "zustand";
-import type { ScenarioSnapshot, Selection } from "@/types/scenario";
+import type {
+  ScenarioSnapshot,
+  Selection,
+  SelectableKind,
+} from "@/types/scenario";
 import type { ChoroplethMetric } from "@/types/country";
 import type { IntelSnapshot, RegionIntel } from "@/types/intel";
 
 export type LayerKey =
-  | "territory"
+  | "oblasts"
   | "cities"
   | "units_ground"
   | "units_air"
   | "units_naval"
-  | "country_choropleth"
-  | "country_bases";
+  | "depots"
+  | "airfields"
+  | "naval_bases"
+  | "border_crossings"
+  | "supply_lines"
+  | "frontline";
 
 export const ALL_LAYERS: LayerKey[] = [
-  "territory",
+  "oblasts",
   "cities",
   "units_ground",
   "units_air",
   "units_naval",
-  "country_choropleth",
-  "country_bases",
+  "depots",
+  "airfields",
+  "naval_bases",
+  "border_crossings",
+  "supply_lines",
+  "frontline",
 ];
+
+export type RightTab = "context" | "decision";
+
+export interface HoverPayload {
+  kind: SelectableKind;
+  id: string;
+  x: number;
+  y: number;
+}
+
+export interface MeasurePoint {
+  lon: number;
+  lat: number;
+}
+
+export interface Bookmark {
+  id: string;
+  label: string;
+  center: [number, number];
+  zoom: number;
+  pitch?: number;
+  bearing?: number;
+}
 
 interface AppState {
   scenario: ScenarioSnapshot | null;
@@ -32,6 +67,7 @@ interface AppState {
   intelTickIntervalMs: number;
 
   selection: Selection;
+  hover: HoverPayload | null;
   visibleLayers: Record<LayerKey, boolean>;
   selectedActionId: string | null;
 
@@ -39,18 +75,42 @@ interface AppState {
   rosterOpen: boolean;
   rosterCompareIds: string[];
 
+  rightTab: RightTab;
+  rightPanelOpen: boolean;
+  leftDockOpen: boolean;
+  oobExpanded: Record<string, boolean>;
+  bookmarks: Bookmark[];
+  measureActive: boolean;
+  measurePath: MeasurePoint[];
+  tickerPaused: boolean;
+  showHelp: boolean;
+
   setScenario: (s: ScenarioSnapshot) => void;
   setLoadError: (e: string | null) => void;
   setIntel: (snapshot: IntelSnapshot) => void;
   setIntelError: (e: string | null) => void;
   select: (sel: Selection) => void;
   clearSelection: () => void;
+  setHover: (h: HoverPayload | null) => void;
   toggleLayer: (k: LayerKey) => void;
+  setLayer: (k: LayerKey, on: boolean) => void;
   selectAction: (id: string | null) => void;
   setChoroplethMetric: (m: ChoroplethMetric) => void;
   setRosterOpen: (open: boolean) => void;
   toggleRosterCompare: (countryId: string) => void;
   clearRosterCompare: () => void;
+  setRightTab: (t: RightTab) => void;
+  setRightPanelOpen: (open: boolean) => void;
+  setLeftDockOpen: (open: boolean) => void;
+  toggleOobNode: (id: string) => void;
+  setOobExpanded: (id: string, on: boolean) => void;
+  addBookmark: (b: Bookmark) => void;
+  removeBookmark: (id: string) => void;
+  setMeasureActive: (on: boolean) => void;
+  pushMeasurePoint: (p: MeasurePoint) => void;
+  clearMeasure: () => void;
+  setTickerPaused: (p: boolean) => void;
+  setShowHelp: (on: boolean) => void;
   intelByRegion: () => Map<string, RegionIntel>;
 }
 
@@ -64,20 +124,35 @@ export const useAppStore = create<AppState>((set, get) => ({
   intelTickIntervalMs: 5000,
 
   selection: null,
+  hover: null,
   visibleLayers: {
-    territory: true,
+    oblasts: true,
     cities: true,
     units_ground: true,
     units_air: true,
     units_naval: true,
-    country_choropleth: false,
-    country_bases: false,
+    depots: true,
+    airfields: true,
+    naval_bases: true,
+    border_crossings: false,
+    supply_lines: true,
+    frontline: true,
   },
   selectedActionId: null,
 
   choroplethMetric: "war_support",
   rosterOpen: false,
   rosterCompareIds: [],
+
+  rightTab: "context",
+  rightPanelOpen: true,
+  leftDockOpen: true,
+  oobExpanded: {},
+  bookmarks: [],
+  measureActive: false,
+  measurePath: [],
+  tickerPaused: false,
+  showHelp: false,
 
   setScenario: (s) =>
     set((state) => ({
@@ -89,11 +164,21 @@ export const useAppStore = create<AppState>((set, get) => ({
   setIntel: (snapshot) =>
     set({ intel: snapshot, intelError: null, lastIntelLoadAt: Date.now() }),
   setIntelError: (e) => set({ intelError: e }),
-  select: (sel) => set({ selection: sel }),
+  select: (sel) =>
+    set(() => ({
+      selection: sel,
+      rightPanelOpen: true,
+      rightTab: "context",
+    })),
   clearSelection: () => set({ selection: null }),
+  setHover: (h) => set({ hover: h }),
   toggleLayer: (k) =>
     set((state) => ({
       visibleLayers: { ...state.visibleLayers, [k]: !state.visibleLayers[k] },
+    })),
+  setLayer: (k, on) =>
+    set((state) => ({
+      visibleLayers: { ...state.visibleLayers, [k]: on },
     })),
   selectAction: (id) => set({ selectedActionId: id }),
   setChoroplethMetric: (m) => set({ choroplethMetric: m }),
@@ -110,6 +195,29 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { rosterCompareIds: [...state.rosterCompareIds, countryId] };
     }),
   clearRosterCompare: () => set({ rosterCompareIds: [] }),
+  setRightTab: (t) => set({ rightTab: t, rightPanelOpen: true }),
+  setRightPanelOpen: (open) => set({ rightPanelOpen: open }),
+  setLeftDockOpen: (open) => set({ leftDockOpen: open }),
+  toggleOobNode: (id) =>
+    set((state) => ({
+      oobExpanded: { ...state.oobExpanded, [id]: !state.oobExpanded[id] },
+    })),
+  setOobExpanded: (id, on) =>
+    set((state) => ({ oobExpanded: { ...state.oobExpanded, [id]: on } })),
+  addBookmark: (b) =>
+    set((state) => ({ bookmarks: [...state.bookmarks.filter((x) => x.id !== b.id), b] })),
+  removeBookmark: (id) =>
+    set((state) => ({ bookmarks: state.bookmarks.filter((b) => b.id !== id) })),
+  setMeasureActive: (on) =>
+    set((state) => ({
+      measureActive: on,
+      measurePath: on ? state.measurePath : [],
+    })),
+  pushMeasurePoint: (p) =>
+    set((state) => ({ measurePath: [...state.measurePath, p] })),
+  clearMeasure: () => set({ measurePath: [] }),
+  setTickerPaused: (p) => set({ tickerPaused: p }),
+  setShowHelp: (on) => set({ showHelp: on }),
   intelByRegion: () => {
     const intel = get().intel;
     const out = new Map<string, RegionIntel>();

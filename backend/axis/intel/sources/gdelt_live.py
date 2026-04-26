@@ -54,20 +54,60 @@ class _RegionQuery:
 # many keywords flips the API into "everything" mode.
 DEFAULT_REGION_QUERIES: tuple[_RegionQuery, ...] = (
     _RegionQuery(
-        region_id="terr.lithuania",
-        query='(Lithuania OR Vilnius OR Kaunas OR Klaipeda OR "Suwalki gap")',
+        region_id="obl.30",
+        query='(Kyiv OR Kiev OR "Ukraine government" OR Bankova)',
     ),
     _RegionQuery(
-        region_id="terr.poland_ne",
-        query='(Bialystok OR Suwalki OR Lublin OR Podlaskie OR "northeast Poland")',
+        region_id="obl.63",
+        query='(Kharkiv OR Kharkov OR Vovchansk OR Kupiansk)',
     ),
     _RegionQuery(
-        region_id="terr.kaliningrad",
-        query='(Kaliningrad OR Chkalovsk OR "Baltic Fleet")',
+        region_id="obl.14",
+        query='(Donetsk OR Bakhmut OR Avdiivka OR Pokrovsk OR Mariupol)',
     ),
     _RegionQuery(
-        region_id="terr.belarus_w",
-        query='(Grodno OR Brest OR Lida OR "western Belarus" OR Belarus)',
+        region_id="obl.09",
+        query='(Luhansk OR Lugansk OR Severodonetsk OR Lyman OR Kreminna)',
+    ),
+    _RegionQuery(
+        region_id="obl.23",
+        query='(Zaporizhzhia OR Zaporozhye OR Tokmak OR Melitopol OR Robotyne)',
+    ),
+    _RegionQuery(
+        region_id="obl.65",
+        query='(Kherson OR "Dnipro estuary" OR Kakhovka OR "left bank")',
+    ),
+    _RegionQuery(
+        region_id="obl.51",
+        query='(Odesa OR Odessa OR "Black Sea grain" OR Izmail)',
+    ),
+    _RegionQuery(
+        region_id="obl.43",
+        query='(Crimea OR Simferopol OR Sevastopol OR "Kerch bridge" OR Dzhankoi)',
+    ),
+    _RegionQuery(
+        region_id="obl.59",
+        query='(Sumy OR "Sumy oblast" OR "Russian border")',
+    ),
+    _RegionQuery(
+        region_id="obl.74",
+        query='(Chernihiv OR "Chernihiv oblast")',
+    ),
+    _RegionQuery(
+        region_id="terr.donbas-occ",
+        query='(Donbas OR "occupied Donetsk" OR "occupied Luhansk")',
+    ),
+    _RegionQuery(
+        region_id="terr.crimea-occ",
+        query='(Crimea OR "occupied Crimea" OR Sevastopol)',
+    ),
+    _RegionQuery(
+        region_id="terr.south-occ",
+        query='("southern Ukraine" OR Melitopol OR Berdiansk OR "land bridge")',
+    ),
+    _RegionQuery(
+        region_id="terr.ukraine-free",
+        query='(Ukraine OR Kyiv OR Lviv OR Dnipro)',
     ),
 )
 

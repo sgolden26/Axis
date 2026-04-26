@@ -3,12 +3,14 @@ import { useAppStore } from "@/state/store";
 import { loadScenario } from "@/api/loadScenario";
 import { loadIntel } from "@/api/loadIntel";
 import { HUD } from "@/ui/HUD";
-import { CommandRail } from "@/ui/CommandRail";
-import { Sidebar } from "@/ui/Sidebar/Sidebar";
+import { LeftDock } from "@/ui/LeftDock/LeftDock";
+import { RightPanel } from "@/ui/RightPanel/RightPanel";
 import { MapView } from "@/map/MapView";
-import { DecisionEngine } from "@/ui/DecisionEngine/DecisionEngine";
 import { CountryRoster } from "@/ui/CountryRoster";
-import { ChoroplethLegend } from "@/ui/ChoroplethLegend";
+import { HoverCard } from "@/ui/HoverCard";
+import { Minimap } from "@/ui/Bottom/Minimap";
+import { BottomBar } from "@/ui/Bottom/BottomBar";
+import { KeyboardShortcuts } from "@/ui/KeyboardShortcuts";
 
 export function App() {
   const setScenario = useAppStore((s) => s.setScenario);
@@ -51,17 +53,19 @@ export function App() {
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-ink-900 text-ink-50">
       <HUD />
       <div className="relative flex flex-1 overflow-hidden">
-        <CommandRail />
+        <LeftDock />
         <main className="relative flex-1 overflow-hidden">
           <MapView />
-          <ChoroplethLegend />
           <CountryRoster />
+          <Minimap />
+          <HoverCard />
+          <KeyboardShortcuts />
           {!scenario && !loadError && <LoadingOverlay />}
           {loadError && <ErrorOverlay message={loadError} />}
         </main>
-        <Sidebar />
-        <DecisionEngine />
+        <RightPanel />
       </div>
+      <BottomBar />
     </div>
   );
 }

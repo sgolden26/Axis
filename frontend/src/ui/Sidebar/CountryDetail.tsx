@@ -69,6 +69,7 @@ const RELATION_LABEL: Record<RelationStatus, string> = {
   neutral: "Neutral",
   strained: "Strained",
   hostile: "Hostile",
+  at_war: "At war",
 };
 
 const RELATION_TONE: Record<RelationStatus, string> = {
@@ -77,6 +78,7 @@ const RELATION_TONE: Record<RelationStatus, string> = {
   neutral: "var(--ink-100)",
   strained: "var(--accent-amber)",
   hostile: "var(--accent-danger)",
+  at_war: "var(--accent-danger)",
 };
 
 const STATUS_LABEL: Record<InventoryStatus, string> = {

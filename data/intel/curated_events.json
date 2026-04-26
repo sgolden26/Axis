@@ -1,413 +1,66 @@
 {
-  "$comment": "Hand-authored events for the eastern_europe scenario. Timestamps use offset_hours relative to export time so the demo always feels fresh. Weights are signed in [-1, 1]; sign is from the perspective of the controlling faction (NATO for terr.lithuania/terr.poland_ne, RU for terr.kaliningrad/terr.belarus_w). See docs/intel.md.",
+  "$comment": "Hand-authored events for the Russia-Ukraine eastern_europe scenario. Timestamps use offset_hours relative to export time so the demo always feels fresh. Weights are signed in [-1, 1]; sign is from the perspective of the de-facto controller of the region (UA for UA-held oblasts, RU for occupied territories). See docs/intel.md.",
   "events": [
-    {
-      "id": "evt.lt.001",
-      "region_id": "terr.lithuania",
-      "offset_hours": -2.5,
-      "category": "nationalist_sentiment",
-      "headline": "Vilnius rally backs increased defence spending",
-      "snippet": "Tens of thousands gathered in Vilnius to back a parliament bill raising defence spending to 4% of GDP, citing concerns over Suwalki corridor security.",
-      "weight": 0.55
-    },
-    {
-      "id": "evt.lt.002",
-      "region_id": "terr.lithuania",
-      "offset_hours": -8.0,
-      "category": "nationalist_sentiment",
-      "headline": "Reservist call-up oversubscribed in Kaunas",
-      "snippet": "Lithuanian defence ministry reports a 140% turnout for the spring reservist exercise. Analysts cite cross-border tension as a driver.",
-      "weight": 0.45
-    },
-    {
-      "id": "evt.lt.003",
-      "region_id": "terr.lithuania",
-      "offset_hours": -14.0,
-      "category": "economic_stress",
-      "headline": "Energy prices climb 11% on grid disconnect anxieties",
-      "snippet": "Spot electricity prices in the Baltic states rose sharply this week amid uncertainty around BRELL synchronisation timelines.",
-      "weight": -0.30
-    },
-    {
-      "id": "evt.lt.004",
-      "region_id": "terr.lithuania",
-      "offset_hours": -22.0,
-      "category": "political_instability",
-      "headline": "Coalition partner threatens walkout over fuel tax",
-      "snippet": "A junior coalition party in Vilnius threatened to leave government over a proposed fuel-tax hike tied to the new defence budget.",
-      "weight": -0.25
-    },
-    {
-      "id": "evt.lt.005",
-      "region_id": "terr.lithuania",
-      "offset_hours": -30.0,
-      "category": "military_loss",
-      "headline": "Two NATO armoured vehicles damaged in training accident",
-      "snippet": "A column of Boxer IFVs from the multinational NATO battlegroup sustained damage during a night exercise near Pabrade. No casualties reported.",
-      "weight": -0.20
-    },
-    {
-      "id": "evt.lt.006",
-      "region_id": "terr.lithuania",
-      "offset_hours": -36.0,
-      "category": "nationalist_sentiment",
-      "headline": "Public opinion poll: 78% support hosting more allied troops",
-      "snippet": "A nationwide poll found record support for permanent allied basing in Lithuania.",
-      "weight": 0.40
-    },
-    {
-      "id": "evt.lt.007",
-      "region_id": "terr.lithuania",
-      "offset_hours": -48.0,
-      "category": "protest",
-      "headline": "Small farmers' protest blocks A1 outside Kaunas",
-      "snippet": "A few hundred farmers blocked the Kaunas-Klaipeda highway over EU subsidy delays. Roads cleared after four hours.",
-      "weight": -0.15
-    },
-    {
-      "id": "evt.lt.008",
-      "region_id": "terr.lithuania",
-      "offset_hours": -64.0,
-      "category": "economic_stress",
-      "headline": "Bank of Lithuania trims growth outlook to 1.6%",
-      "snippet": "Central bank cited weaker external demand and elevated defence imports.",
-      "weight": -0.20
-    },
-    {
-      "id": "evt.lt.009",
-      "region_id": "terr.lithuania",
-      "offset_hours": -82.0,
-      "category": "nationalist_sentiment",
-      "headline": "Independence anniversary draws record crowds",
-      "snippet": "Cathedral Square in Vilnius saw the largest March 11 turnout in a decade.",
-      "weight": 0.35
-    },
-    {
-      "id": "evt.lt.010",
-      "region_id": "terr.lithuania",
-      "offset_hours": -110.0,
-      "category": "military_loss",
-      "headline": "Cyber probe attributed to GRU disrupts railway scheduling briefly",
-      "snippet": "Lithuanian Railways reported a 90-minute outage after a state-linked intrusion attempt.",
-      "weight": -0.30
-    },
-    {
-      "id": "evt.lt.011",
-      "region_id": "terr.lithuania",
-      "offset_hours": -130.0,
-      "category": "political_instability",
-      "headline": "Justice minister survives narrow no-confidence vote",
-      "snippet": "Vote split 71-69 in the Seimas; coalition holds, but unity is fraying.",
-      "weight": -0.20
-    },
-    {
-      "id": "evt.lt.012",
-      "region_id": "terr.lithuania",
-      "offset_hours": -160.0,
-      "category": "nationalist_sentiment",
-      "headline": "Defence procurement bill clears committee with 90% support",
-      "snippet": "Cross-party support for the package signals strong public mood for hardening.",
-      "weight": 0.30
-    },
+    { "id": "evt.kyiv.001", "region_id": "obl.30", "offset_hours": -1.5, "category": "military_loss", "headline": "Drone wave intercepted over Kyiv overnight", "snippet": "Air Force reports 38 of 41 Shahed-136 drones downed; debris damaged a substation in the Solomianskyi district.", "weight": -0.40 },
+    { "id": "evt.kyiv.002", "region_id": "obl.30", "offset_hours": -7.0, "category": "nationalist_sentiment", "headline": "Rada extends martial law and mobilisation by 90 days", "snippet": "Vote 327-3; opposition factions joined the coalition in approving the extension.", "weight": 0.40 },
+    { "id": "evt.kyiv.003", "region_id": "obl.30", "offset_hours": -16.0, "category": "political_instability", "headline": "Anti-corruption arrests at Defence Procurement Agency", "snippet": "NABU detained two senior officials over inflated drone-component contracts.", "weight": -0.25 },
+    { "id": "evt.kyiv.004", "region_id": "obl.30", "offset_hours": -36.0, "category": "nationalist_sentiment", "headline": "Crowds line Khreshchatyk for fallen-soldiers procession", "snippet": "Estimated 60,000 attended the public funeral procession; mood subdued, defiant.", "weight": 0.35 },
+    { "id": "evt.kyiv.005", "region_id": "obl.30", "offset_hours": -72.0, "category": "economic_stress", "headline": "Hryvnia weakens 1.6% on aid uncertainty", "snippet": "NBU intervened on the spot market after a US tranche delay headline.", "weight": -0.30 },
 
-    {
-      "id": "evt.pl.001",
-      "region_id": "terr.poland_ne",
-      "offset_hours": -3.0,
-      "category": "nationalist_sentiment",
-      "headline": "Warsaw approves new armoured division standup near Suwalki",
-      "snippet": "Polish MoD confirmed accelerated formation of the 1st Armoured Division HQ in Bialystok with full IOC by autumn.",
-      "weight": 0.55
-    },
-    {
-      "id": "evt.pl.002",
-      "region_id": "terr.poland_ne",
-      "offset_hours": -10.0,
-      "category": "nationalist_sentiment",
-      "headline": "Polish K2 tank deliveries accelerate",
-      "snippet": "Hyundai Rotem confirmed an early delivery of 24 K2 tanks ahead of contract schedule, mostly destined for the eastern flank.",
-      "weight": 0.40
-    },
-    {
-      "id": "evt.pl.003",
-      "region_id": "terr.poland_ne",
-      "offset_hours": -16.0,
-      "category": "protest",
-      "headline": "Farmers' protest near Bialystok blocks border traffic",
-      "snippet": "Around 600 farmers blocked the S8 protesting Ukrainian grain imports. Police negotiating partial reopening.",
-      "weight": -0.30
-    },
-    {
-      "id": "evt.pl.004",
-      "region_id": "terr.poland_ne",
-      "offset_hours": -28.0,
-      "category": "economic_stress",
-      "headline": "Inflation in NE voivodeships rebounds to 5.2% YoY",
-      "snippet": "Lublin and Podlaskie reported the steepest jumps; food and energy costs cited.",
-      "weight": -0.25
-    },
-    {
-      "id": "evt.pl.005",
-      "region_id": "terr.poland_ne",
-      "offset_hours": -40.0,
-      "category": "nationalist_sentiment",
-      "headline": "Prime minister visits 18th Mech Bde, pledges accelerated readiness",
-      "snippet": "Visit to Bialystok included a public announcement of a 12% pay raise for combat units.",
-      "weight": 0.45
-    },
-    {
-      "id": "evt.pl.006",
-      "region_id": "terr.poland_ne",
-      "offset_hours": -56.0,
-      "category": "military_loss",
-      "headline": "Drone incursion downs power line near Sejny",
-      "snippet": "Suspected Belarus-launched drone clipped a 110kV line. No casualties; outage restored in 8 hours.",
-      "weight": -0.35
-    },
-    {
-      "id": "evt.pl.007",
-      "region_id": "terr.poland_ne",
-      "offset_hours": -72.0,
-      "category": "protest",
-      "headline": "Truckers stage rolling slowdown at Kuznica crossing",
-      "snippet": "Polish hauliers slowed border traffic to a crawl over EU permit changes.",
-      "weight": -0.20
-    },
-    {
-      "id": "evt.pl.008",
-      "region_id": "terr.poland_ne",
-      "offset_hours": -90.0,
-      "category": "nationalist_sentiment",
-      "headline": "Public approval for NATO posture hits 86%",
-      "snippet": "CBOS poll: 86% support permanent US basing in Poland; 74% back forward presence in NE region.",
-      "weight": 0.35
-    },
-    {
-      "id": "evt.pl.009",
-      "region_id": "terr.poland_ne",
-      "offset_hours": -120.0,
-      "category": "political_instability",
-      "headline": "Local mayor clashes with central government over land use",
-      "snippet": "Augustow mayor publicly opposed expansion of training ground; standoff continues.",
-      "weight": -0.15
-    },
-    {
-      "id": "evt.pl.010",
-      "region_id": "terr.poland_ne",
-      "offset_hours": -150.0,
-      "category": "economic_stress",
-      "headline": "Border-region tourism revenue down 22% YoY",
-      "snippet": "Operators cite security perception and reduced cross-border traffic with Belarus.",
-      "weight": -0.20
-    },
-    {
-      "id": "evt.pl.011",
-      "region_id": "terr.poland_ne",
-      "offset_hours": -180.0,
-      "category": "nationalist_sentiment",
-      "headline": "Volunteer territorial defence enrolment up 31%",
-      "snippet": "WOT reports surge in NE voivodeships, citing recent drone incidents.",
-      "weight": 0.30
-    },
+    { "id": "evt.khar.001", "region_id": "obl.63", "offset_hours": -2.0, "category": "military_loss", "headline": "Glide-bomb strike on Vovchansk industrial site", "snippet": "Two FAB-1500 hits reported; oblast administration confirms civilian casualties.", "weight": -0.65 },
+    { "id": "evt.khar.002", "region_id": "obl.63", "offset_hours": -8.0, "category": "military_loss", "headline": "Russian assault near Lyptsi repulsed", "snippet": "57th Mech Bde claims six AFV kills; OSINT confirms three.", "weight": 0.30 },
+    { "id": "evt.khar.003", "region_id": "obl.63", "offset_hours": -18.0, "category": "protest", "headline": "Kharkiv residents stage rooftop drone-spotting vigils", "snippet": "Civic group coordinates volunteer air-watch teams around residential blocks.", "weight": -0.20 },
+    { "id": "evt.khar.004", "region_id": "obl.63", "offset_hours": -36.0, "category": "economic_stress", "headline": "Power deficit forces 8-hour blackout schedules", "snippet": "Repeated S-300 strikes on Kharkiv-2 substation; emergency works ongoing.", "weight": -0.50 },
+    { "id": "evt.khar.005", "region_id": "obl.63", "offset_hours": -60.0, "category": "nationalist_sentiment", "headline": "Patriot battery deployment confirmed near city", "snippet": "Air Force statement; senior commanders cite fewer ballistic-missile strikes.", "weight": 0.40 },
 
-    {
-      "id": "evt.kgd.001",
-      "region_id": "terr.kaliningrad",
-      "offset_hours": -1.5,
-      "category": "military_loss",
-      "headline": "Reports of fuel-depot fire at Chkalovsk airbase",
-      "snippet": "Open-source imagery shows smoke plume consistent with a fuel-storage detonation. Russian sources blame 'technical incident'.",
-      "weight": -0.65
-    },
-    {
-      "id": "evt.kgd.002",
-      "region_id": "terr.kaliningrad",
-      "offset_hours": -6.0,
-      "category": "economic_stress",
-      "headline": "EU sanctions tighten on Kaliningrad transit",
-      "snippet": "New EU package restricts dual-use transit through Lithuanian rail corridor; oblast officials warn of supply pinch.",
-      "weight": -0.55
-    },
-    {
-      "id": "evt.kgd.003",
-      "region_id": "terr.kaliningrad",
-      "offset_hours": -12.0,
-      "category": "protest",
-      "headline": "Small protest in Kaliningrad over price of basic goods",
-      "snippet": "Roughly 300 demonstrators in Pobedy Square; police dispersed the gathering within an hour.",
-      "weight": -0.30
-    },
-    {
-      "id": "evt.kgd.004",
-      "region_id": "terr.kaliningrad",
-      "offset_hours": -20.0,
-      "category": "political_instability",
-      "headline": "Governor reshuffle after critical Telegram leak",
-      "snippet": "Two deputy governors removed after an internal memo on logistics shortfalls leaked online.",
-      "weight": -0.40
-    },
-    {
-      "id": "evt.kgd.005",
-      "region_id": "terr.kaliningrad",
-      "offset_hours": -30.0,
-      "category": "nationalist_sentiment",
-      "headline": "State media broadcasts Baltic Fleet anniversary parade",
-      "snippet": "Heavy state media coverage of fleet review; counter-narrative against Western pressure.",
-      "weight": 0.30
-    },
-    {
-      "id": "evt.kgd.006",
-      "region_id": "terr.kaliningrad",
-      "offset_hours": -42.0,
-      "category": "military_loss",
-      "headline": "Iskander unit relocates further inland after OSINT exposure",
-      "snippet": "Geolocated imagery prompted a redeployment of a brigade-level Iskander battery.",
-      "weight": -0.25
-    },
-    {
-      "id": "evt.kgd.007",
-      "region_id": "terr.kaliningrad",
-      "offset_hours": -60.0,
-      "category": "economic_stress",
-      "headline": "Rouble weakness pushes import inflation in oblast above 9%",
-      "snippet": "Imported goods, dominant in Kaliningrad's consumer basket, have driven a sharp price spike.",
-      "weight": -0.30
-    },
-    {
-      "id": "evt.kgd.008",
-      "region_id": "terr.kaliningrad",
-      "offset_hours": -78.0,
-      "category": "protest",
-      "headline": "Quiet vigil for Ukrainian-born detainee broken up",
-      "snippet": "Small civil-society vigil broken up; multiple detentions reported.",
-      "weight": -0.20
-    },
-    {
-      "id": "evt.kgd.009",
-      "region_id": "terr.kaliningrad",
-      "offset_hours": -100.0,
-      "category": "nationalist_sentiment",
-      "headline": "State TV runs week-long 'Western containment' series",
-      "snippet": "Media campaign aims to consolidate domestic support for the Baltic Fleet build-up.",
-      "weight": 0.20
-    },
-    {
-      "id": "evt.kgd.010",
-      "region_id": "terr.kaliningrad",
-      "offset_hours": -130.0,
-      "category": "military_loss",
-      "headline": "Su-30 makes emergency landing after engine fire",
-      "snippet": "Crew safe; airframe written off. Fleet readiness hit by maintenance backlog.",
-      "weight": -0.30
-    },
-    {
-      "id": "evt.kgd.011",
-      "region_id": "terr.kaliningrad",
-      "offset_hours": -170.0,
-      "category": "political_instability",
-      "headline": "Anti-corruption arrests sweep oblast administration",
-      "snippet": "FSB-led arrests target customs and procurement officials in a high-profile case.",
-      "weight": -0.25
-    },
+    { "id": "evt.don.001", "region_id": "obl.14", "offset_hours": -2.5, "category": "military_loss", "headline": "Heavy fighting reported in Chasiv Yar microdistrict", "snippet": "ISW notes Russian advance along Stupky neighbourhood; UA defenders consolidate west.", "weight": -0.50 },
+    { "id": "evt.don.002", "region_id": "obl.14", "offset_hours": -10.0, "category": "military_loss", "headline": "Russian armoured assault destroyed near Pokrovsk", "snippet": "47th Mech Bde geolocated 14 vehicle hulks across a single field.", "weight": 0.45 },
+    { "id": "evt.don.003", "region_id": "obl.14", "offset_hours": -22.0, "category": "military_loss", "headline": "Glide-bomb damage to Toretsk hospital", "snippet": "Three confirmed dead; oblast head calls for civilian evacuations.", "weight": -0.55 },
+    { "id": "evt.don.004", "region_id": "obl.14", "offset_hours": -40.0, "category": "protest", "headline": "Mariupol diaspora protests in Lviv on city anniversary", "snippet": "Crowd of 4,000 in central Lviv mark the city's symbolic resistance day.", "weight": 0.20 },
+    { "id": "evt.don.005", "region_id": "obl.14", "offset_hours": -90.0, "category": "nationalist_sentiment", "headline": "Volunteer brigade recruitment exceeds quota", "snippet": "Azov-12 reports oversubscribed sign-ups for new battalion stand-up.", "weight": 0.35 },
 
-    {
-      "id": "evt.belw.001",
-      "region_id": "terr.belarus_w",
-      "offset_hours": -2.0,
-      "category": "protest",
-      "headline": "Mass protests in Grodno over conscription orders",
-      "snippet": "Several thousand demonstrators gathered in central Grodno after fresh conscription notices targeting a wider age band.",
-      "weight": -0.65
-    },
-    {
-      "id": "evt.belw.002",
-      "region_id": "terr.belarus_w",
-      "offset_hours": -7.0,
-      "category": "political_instability",
-      "headline": "Local council walkouts spread across western Belarus",
-      "snippet": "Three regional councils in Grodno Voblast suspended sittings after opposition deputies refused to ratify mobilisation directives.",
-      "weight": -0.55
-    },
-    {
-      "id": "evt.belw.003",
-      "region_id": "terr.belarus_w",
-      "offset_hours": -14.0,
-      "category": "economic_stress",
-      "headline": "Belarus rouble weakens 6% after sanctions package",
-      "snippet": "New EU/UK sanctions trigger sharp depreciation; queues form at currency exchanges.",
-      "weight": -0.45
-    },
-    {
-      "id": "evt.belw.004",
-      "region_id": "terr.belarus_w",
-      "offset_hours": -22.0,
-      "category": "military_loss",
-      "headline": "Reports of desertions from 6th Sep Motor Rifle Bde",
-      "snippet": "Unverified Telegram channels report a wave of unauthorised absences from a brigade based near Grodno.",
-      "weight": -0.55
-    },
-    {
-      "id": "evt.belw.005",
-      "region_id": "terr.belarus_w",
-      "offset_hours": -32.0,
-      "category": "nationalist_sentiment",
-      "headline": "State rally in Minsk projects unity message",
-      "snippet": "Government-organised rally drew tens of thousands; messaging emphasised Union State solidarity.",
-      "weight": 0.20
-    },
-    {
-      "id": "evt.belw.006",
-      "region_id": "terr.belarus_w",
-      "offset_hours": -45.0,
-      "category": "protest",
-      "headline": "Sit-in at Brest railway station enters second day",
-      "snippet": "Workers protest unpaid bonuses; police presence increases but situation remains static.",
-      "weight": -0.40
-    },
-    {
-      "id": "evt.belw.007",
-      "region_id": "terr.belarus_w",
-      "offset_hours": -60.0,
-      "category": "economic_stress",
-      "headline": "Wholesale food prices climb 12% in western oblasts",
-      "snippet": "Border-trade disruptions and rouble weakness combine to push prices higher.",
-      "weight": -0.35
-    },
-    {
-      "id": "evt.belw.008",
-      "region_id": "terr.belarus_w",
-      "offset_hours": -80.0,
-      "category": "military_loss",
-      "headline": "Equipment fire at western Belarus depot",
-      "snippet": "OSINT analysts report a fire at an ammo depot near Lida; impact on readiness unclear.",
-      "weight": -0.45
-    },
-    {
-      "id": "evt.belw.009",
-      "region_id": "terr.belarus_w",
-      "offset_hours": -105.0,
-      "category": "political_instability",
-      "headline": "Independent unions report fresh crackdown",
-      "snippet": "Several union leaders detained; activists relocate operations abroad.",
-      "weight": -0.30
-    },
-    {
-      "id": "evt.belw.010",
-      "region_id": "terr.belarus_w",
-      "offset_hours": -135.0,
-      "category": "protest",
-      "headline": "Diaspora-led 'silent walks' draw participation in Grodno",
-      "snippet": "Quiet protest movement re-emerges; turnout modest but growing.",
-      "weight": -0.25
-    },
-    {
-      "id": "evt.belw.011",
-      "region_id": "terr.belarus_w",
-      "offset_hours": -170.0,
-      "category": "nationalist_sentiment",
-      "headline": "State TV runs hour-long Union State special",
-      "snippet": "Heavy-handed messaging trying to consolidate base; analysts skeptical of impact.",
-      "weight": 0.15
-    }
+    { "id": "evt.luh.001", "region_id": "obl.09", "offset_hours": -3.0, "category": "military_loss", "headline": "ATACMS strike on Luhansk military airfield", "snippet": "Open-source imagery shows damaged hardstand and two ammunition fires.", "weight": 0.55 },
+    { "id": "evt.luh.002", "region_id": "obl.09", "offset_hours": -14.0, "category": "political_instability", "headline": "Occupation 'governor' issues new mobilisation decree", "snippet": "Decree widens age band; reports of refusals on Telegram channels.", "weight": -0.40 },
+    { "id": "evt.luh.003", "region_id": "obl.09", "offset_hours": -28.0, "category": "economic_stress", "headline": "Sanctions tighten on occupation banking workarounds", "snippet": "OFAC adds two Luhansk-based shell entities to designations.", "weight": -0.30 },
+    { "id": "evt.luh.004", "region_id": "obl.09", "offset_hours": -55.0, "category": "military_loss", "headline": "Severodonetsk rail bridge struck", "snippet": "GUR claims credit; rail traffic disrupted for 36 hours.", "weight": 0.50 },
+
+    { "id": "evt.zap.001", "region_id": "obl.23", "offset_hours": -2.0, "category": "military_loss", "headline": "Robotyne salient under Russian probing attacks", "snippet": "82nd Air Assault Bde reports two repulsed company-strength assaults.", "weight": 0.20 },
+    { "id": "evt.zap.002", "region_id": "obl.23", "offset_hours": -12.0, "category": "military_loss", "headline": "Strike on Berdyansk airfield reported", "snippet": "Long-range UAV strike geolocated; secondary detonations recorded.", "weight": 0.50 },
+    { "id": "evt.zap.003", "region_id": "obl.23", "offset_hours": -30.0, "category": "economic_stress", "headline": "ZNPP cooling-pond level at lowest since reactor shutdown", "snippet": "IAEA flags concerns over cooling water margin at occupied plant.", "weight": -0.40 },
+    { "id": "evt.zap.004", "region_id": "obl.23", "offset_hours": -55.0, "category": "nationalist_sentiment", "headline": "Tokmak partisan leaflets reported in city centre", "snippet": "Local residents post photos of resistance leaflets near rail station.", "weight": 0.25 },
+
+    { "id": "evt.kher.001", "region_id": "obl.65", "offset_hours": -3.5, "category": "military_loss", "headline": "FPV drone wave on Kherson left bank crossings", "snippet": "Brigade claims dozens of small-boat denials over 24 hours.", "weight": 0.30 },
+    { "id": "evt.kher.002", "region_id": "obl.65", "offset_hours": -18.0, "category": "protest", "headline": "Kherson residents demand stronger AD coverage", "snippet": "Petition with 12,000 signatures handed to oblast administration.", "weight": -0.25 },
+    { "id": "evt.kher.003", "region_id": "obl.65", "offset_hours": -42.0, "category": "economic_stress", "headline": "Grain depot loss to Russian shelling", "snippet": "Significant 2025 stocks destroyed; insurers re-pricing routes.", "weight": -0.45 },
+
+    { "id": "evt.ode.001", "region_id": "obl.51", "offset_hours": -2.0, "category": "military_loss", "headline": "Cruise-missile strike on Pivdennyi port infrastructure", "snippet": "Two Kalibr impacts on grain terminal; one casualty reported.", "weight": -0.55 },
+    { "id": "evt.ode.002", "region_id": "obl.51", "offset_hours": -10.0, "category": "nationalist_sentiment", "headline": "Naval drone unit announces upgraded Magura-V7 variant", "snippet": "GUR-13 cited longer range and dual-warhead options.", "weight": 0.40 },
+    { "id": "evt.ode.003", "region_id": "obl.51", "offset_hours": -28.0, "category": "economic_stress", "headline": "Black Sea insurance premia spike after BSF posture", "snippet": "Lloyd's List reports double-digit jump on Odesa-bound hulls.", "weight": -0.35 },
+
+    { "id": "evt.cri.001", "region_id": "obl.43", "offset_hours": -1.5, "category": "military_loss", "headline": "Storm Shadow strike near Saki airfield", "snippet": "Multiple impacts on hardstand; satellite imagery shows two destroyed Su-30s.", "weight": 0.65 },
+    { "id": "evt.cri.002", "region_id": "obl.43", "offset_hours": -8.0, "category": "military_loss", "headline": "Black Sea Fleet ship ATACMS-damaged in Sevastopol", "snippet": "Ropucha-class LST reported listing; OSINT confirms drone-spotted hit.", "weight": 0.65 },
+    { "id": "evt.cri.003", "region_id": "obl.43", "offset_hours": -24.0, "category": "economic_stress", "headline": "Crimean rail freight redirected to Kerch bridge", "snippet": "Rail authority cites increased throughput pressure on bridge.", "weight": -0.30 },
+    { "id": "evt.cri.004", "region_id": "obl.43", "offset_hours": -64.0, "category": "political_instability", "headline": "Occupation administration shake-up after FSB probe", "snippet": "Two deputies replaced after corruption indictments leaked online.", "weight": -0.30 },
+    { "id": "evt.cri.005", "region_id": "obl.43", "offset_hours": -100.0, "category": "protest", "headline": "Crimean Tatar diaspora vigil in Istanbul", "snippet": "Quiet but well-attended event marking deportation anniversary.", "weight": 0.20 },
+
+    { "id": "evt.sum.001", "region_id": "obl.59", "offset_hours": -3.0, "category": "military_loss", "headline": "Cross-border shelling on Sumy outskirts", "snippet": "Two civilian casualties; oblast head calls for stronger AD.", "weight": -0.45 },
+    { "id": "evt.sum.002", "region_id": "obl.59", "offset_hours": -18.0, "category": "nationalist_sentiment", "headline": "TerDef brigade graduates new training cohort", "snippet": "Sumy 117th TerDef Bde reports 800 personnel completed certification.", "weight": 0.30 },
+    { "id": "evt.sum.003", "region_id": "obl.59", "offset_hours": -50.0, "category": "military_loss", "headline": "FAB-500 hits Sumy district hospital wing", "snippet": "Building partially collapsed; rescue ongoing; civilian deaths.", "weight": -0.60 },
+
+    { "id": "evt.che.001", "region_id": "obl.74", "offset_hours": -4.0, "category": "military_loss", "headline": "Drone activity over Chernihiv reservoir overnight", "snippet": "Air Force reports 11 of 13 Shahed downed; one civilian wounded.", "weight": -0.30 },
+    { "id": "evt.che.002", "region_id": "obl.74", "offset_hours": -22.0, "category": "nationalist_sentiment", "headline": "Memorial unveiled to 2022 defenders", "snippet": "Public ceremony with battle veterans; mood reflective, resolute.", "weight": 0.30 },
+
+    { "id": "evt.donbas.001", "region_id": "terr.donbas-occ", "offset_hours": -2.0, "category": "military_loss", "headline": "Geolocated UA HIMARS strike on Donetsk depot", "snippet": "Multiple secondary detonations; ammunition stockpile assessed destroyed.", "weight": 0.55 },
+    { "id": "evt.donbas.002", "region_id": "terr.donbas-occ", "offset_hours": -28.0, "category": "political_instability", "headline": "Occupation security service detains local journalists", "snippet": "Three independent reporters detained; media-rights groups protest.", "weight": -0.30 },
+
+    { "id": "evt.crimea.001", "region_id": "terr.crimea-occ", "offset_hours": -3.0, "category": "military_loss", "headline": "Sevastopol harbour drone-boat probe at dawn", "snippet": "Multiple Magura-V5 reported entering harbour; results unclear.", "weight": 0.45 },
+    { "id": "evt.crimea.002", "region_id": "terr.crimea-occ", "offset_hours": -36.0, "category": "economic_stress", "headline": "Tourism bookings down 60% YoY", "snippet": "Local industry body cites missile strikes and Western advisories.", "weight": -0.40 },
+
+    { "id": "evt.south.001", "region_id": "terr.south-occ", "offset_hours": -4.0, "category": "military_loss", "headline": "ATACMS strikes near Berdyansk rail yard", "snippet": "Open-source imagery confirms damage; rail-flow impact for 24h.", "weight": 0.50 },
+    { "id": "evt.south.002", "region_id": "terr.south-occ", "offset_hours": -50.0, "category": "protest", "headline": "Partisan-attributed leaflets in Melitopol", "snippet": "Local Telegram channels share photos; FSB sweep reported.", "weight": 0.25 },
+
+    { "id": "evt.free.001", "region_id": "terr.ukraine-free", "offset_hours": -6.0, "category": "nationalist_sentiment", "headline": "Allied tranche of long-range munitions confirmed", "snippet": "Joint statement notes accelerated delivery of GLSDB and ATACMS.", "weight": 0.55 },
+    { "id": "evt.free.002", "region_id": "terr.ukraine-free", "offset_hours": -18.0, "category": "economic_stress", "headline": "Energy ministry warns winter blackouts likely without rapid repairs", "snippet": "Substation losses cited; emergency procurement under way.", "weight": -0.35 },
+    { "id": "evt.free.003", "region_id": "terr.ukraine-free", "offset_hours": -72.0, "category": "nationalist_sentiment", "headline": "Public approval of armed forces holds at 95%", "snippet": "KIIS poll; confidence in leadership tracks national mood.", "weight": 0.40 }
   ]
 }

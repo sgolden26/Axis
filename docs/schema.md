@@ -15,20 +15,78 @@ independently of the static world.
 
 ```jsonc
 {
-  "schema_version": "0.3.0",
+  "schema_version": "0.4.0",
   "scenario": {
     "id": "eastern_europe",
-    "name": "Suwalki Gap",
+    "name": "Russia / Ukraine theatre",
     "classification": "UNCLASSIFIED // EXERCISE",
     "clock": "2026-04-25T11:00:00Z",
-    "bbox": [18.0, 52.0, 28.0, 56.5]   // [minLon, minLat, maxLon, maxLat]
+    "bbox": [22.0, 44.0, 50.0, 56.0]   // [minLon, minLat, maxLon, maxLat]
   },
   "factions": [Faction, ...],
   "countries": [Country, ...],
   "cities": [City, ...],
   "territories": [Territory, ...],
+  "oblasts": [Oblast, ...],
   "units": [Unit, ...],
+  "depots": [Depot, ...],
+  "airfields": [Airfield, ...],
+  "naval_bases": [NavalBase, ...],
+  "border_crossings": [BorderCrossing, ...],
+  "supply_lines": [SupplyLine, ...],
+  "isr_coverages": [IsrCoverage, ...],
+  "missile_ranges": [MissileRange, ...],
+  "aors": [Aor, ...],
+  "frontlines": [Frontline, ...],
   "actions": [Action, ...]
+}
+```
+
+## Oblast (admin-1 region)
+
+```jsonc
+{
+  "id": "oblast.UA-46",
+  "iso_3166_2": "UA-46",      // joins frontend/public/borders/admin1_ua.geojson
+  "name": "Lviv",
+  "country_id": "ua",
+  "faction_id": "ua",
+  "population": 2497750,
+  "area_km2": 21833,
+  "control": 1.0,              // 0..1 share of effective control
+  "contested": false,
+  "morale": 0.74,
+  "civil_unrest": 0.12,
+  "refugees_outflow": 4200,
+  "centroid": [24.03, 49.84],
+  "available_actions": ["evacuate_civilians"]
+}
+```
+
+## Military assets
+
+`Depot`, `Airfield`, `NavalBase`, `BorderCrossing` are point features with
+`position: [lon, lat]`, faction colouring and kind-specific extras
+(`capacity` + `fill` for depots; `runway_m`, `role`, `based_aircraft` for
+airfields; `pier_count`, `home_port_for` for naval bases; `mode`, `road`,
+`rail`, `countries` for crossings). `SupplyLine` is a polyline with a
+`mode` (`road | rail | air | sea`), `from_id`/`to_id`, `path` of `[lon, lat]`
+vertices and a normalised `health`. `IsrCoverage` is a sector or omni circle
+(`origin`, `range_km`, `heading_deg`, `beam_deg`, `platform`, `confidence`).
+`MissileRange` is the same shape with `weapon`, `category` (`sram | mrbm | irbm | cruise | hgv`).
+`Aor` is a polygon (one or more rings) tied to a `formation_id`.
+
+## Frontline
+
+```jsonc
+{
+  "id": "front.donbas",
+  "name": "Donbas line of contact",
+  "path": [[lon, lat], ...],
+  "buffer_km": 12,                 // contested band width to render around the trace
+  "updated_at": "2026-04-20T00:00:00Z",
+  "notes": "Approximate line of contact (open source).",
+  "available_actions": []
 }
 ```
 
@@ -215,7 +273,7 @@ breakdown. See [decision-engine.md](./decision-engine.md) for the formula.
 
 - Coordinates are always `[lon, lat]` to match GeoJSON / MapLibre.
 - All floats in `[0, 1]` are normalised intensity / share scores. Bilateral relation scores are signed in `[-1, +1]`.
-- IDs are namespaced (`city.*`, `unit.<faction>.*`, `terr.*`) and stable across exports of the same scenario. Country ids are short ISO-style slugs (`lt`, `by`, ...).
-- `country_id` on `City`, `Territory`, `Unit` is optional. If absent, the entity is alliance-only (no parent country dossier).
-- `available_actions` on `Unit` and `Country` is a list of affordance ids. v1 surfaces them as disabled buttons; execution lands later.
+- IDs are namespaced (`city.*`, `unit.<faction>.*`, `terr.*`, `oblast.<iso>.*`, `depot.*`, `afld.*`, `nbase.*`, `cross.*`, `supply.*`, `isr.*`, `msl.*`, `aor.*`, `front.*`) and stable across exports of the same scenario. Country ids are short ISO-style slugs (`ru`, `ua`, `by`, ...).
+- `country_id` on `City`, `Territory`, `Unit`, `Oblast` is optional for some, required for `Oblast`. Alliance-only entities omit it where allowed.
+- `available_actions` on every entity is a list of affordance ids. v1 surfaces them as disabled buttons; execution lands later.
 - Unknown fields must be ignored by the frontend (forward-compatible).

@@ -39,6 +39,7 @@ export const relationStatusSchema = z.enum([
   "neutral",
   "strained",
   "hostile",
+  "at_war",
 ]);
 export type RelationStatus = z.infer<typeof relationStatusSchema>;
 

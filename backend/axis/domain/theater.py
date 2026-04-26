@@ -10,6 +10,18 @@ from axis.domain.city import City
 from axis.domain.coordinates import BoundingBox
 from axis.domain.country import Country
 from axis.domain.faction import Faction
+from axis.domain.frontline import Frontline
+from axis.domain.military_assets import (
+    Airfield,
+    AreaOfResponsibility,
+    BorderCrossing,
+    Depot,
+    IsrCoverage,
+    MissileRange,
+    NavalBase,
+    SupplyLine,
+)
+from axis.domain.oblast import Oblast
 from axis.domain.territory import Territory
 
 if TYPE_CHECKING:
@@ -18,12 +30,7 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class Theater:
-    """The world state for a scenario at a point in time.
-
-    Holds factions, countries, cities, territories and units. Lookup by id is
-    supported via helper methods. Future sim/intel layers will mutate this
-    object (or produce a new one), but v1 treats it as immutable after build.
-    """
+    """The world state for a scenario at a point in time."""
 
     id: str
     name: str
@@ -34,7 +41,17 @@ class Theater:
     countries: list[Country] = field(default_factory=list)
     cities: list[City] = field(default_factory=list)
     territories: list[Territory] = field(default_factory=list)
+    oblasts: list[Oblast] = field(default_factory=list)
     units: "list[Unit]" = field(default_factory=list)
+    depots: list[Depot] = field(default_factory=list)
+    airfields: list[Airfield] = field(default_factory=list)
+    naval_bases: list[NavalBase] = field(default_factory=list)
+    border_crossings: list[BorderCrossing] = field(default_factory=list)
+    supply_lines: list[SupplyLine] = field(default_factory=list)
+    isr_coverages: list[IsrCoverage] = field(default_factory=list)
+    missile_ranges: list[MissileRange] = field(default_factory=list)
+    aors: list[AreaOfResponsibility] = field(default_factory=list)
+    frontlines: list[Frontline] = field(default_factory=list)
 
     def faction(self, faction_id: str) -> Faction:
         for f in self.factions:
@@ -52,17 +69,19 @@ class Theater:
         """Check referential integrity. Raises on first inconsistency."""
         faction_ids = {f.id for f in self.factions}
         country_ids = {c.id for c in self.countries}
+        city_ids = {c.id for c in self.cities}
+        unit_ids = {u.id for u in self.units}
+
         for country in self.countries:
             if country.faction_id not in faction_ids:
                 raise ValueError(
                     f"Country {country.id} references unknown faction {country.faction_id}"
                 )
-            if country.capital_city_id is not None:
-                if country.capital_city_id not in {c.id for c in self.cities}:
-                    raise ValueError(
-                        f"Country {country.id} capital_city_id {country.capital_city_id} "
-                        "is not in cities"
-                    )
+            if country.capital_city_id is not None and country.capital_city_id not in city_ids:
+                raise ValueError(
+                    f"Country {country.id} capital_city_id {country.capital_city_id} "
+                    "is not in cities"
+                )
         for city in self.cities:
             if city.faction_id not in faction_ids:
                 raise ValueError(f"City {city.id} references unknown faction {city.faction_id}")
@@ -85,4 +104,40 @@ class Theater:
             if unit.country_id is not None and unit.country_id not in country_ids:
                 raise ValueError(
                     f"Unit {unit.id} references unknown country {unit.country_id}"
+                )
+        for o in self.oblasts:
+            if o.country_id not in country_ids:
+                raise ValueError(f"Oblast {o.id} references unknown country {o.country_id}")
+            if o.faction_id not in faction_ids:
+                raise ValueError(f"Oblast {o.id} references unknown faction {o.faction_id}")
+            if o.capital_city_id is not None and o.capital_city_id not in city_ids:
+                raise ValueError(
+                    f"Oblast {o.id} capital_city_id {o.capital_city_id} is not in cities"
+                )
+        for assets, label in (
+            (self.depots, "Depot"),
+            (self.airfields, "Airfield"),
+            (self.naval_bases, "NavalBase"),
+            (self.border_crossings, "BorderCrossing"),
+            (self.supply_lines, "SupplyLine"),
+            (self.isr_coverages, "IsrCoverage"),
+            (self.missile_ranges, "MissileRange"),
+            (self.aors, "AOR"),
+        ):
+            for a in assets:
+                if a.faction_id not in faction_ids:
+                    raise ValueError(f"{label} {a.id} unknown faction {a.faction_id}")
+                country_id = getattr(a, "country_id", None)
+                if country_id is not None and country_id not in country_ids:
+                    raise ValueError(f"{label} {a.id} unknown country {country_id}")
+        for cr in self.border_crossings:
+            for cid in cr.countries:
+                if cid not in country_ids:
+                    raise ValueError(
+                        f"BorderCrossing {cr.id} references unknown country {cid}"
+                    )
+        for aor in self.aors:
+            if aor.formation_id is not None and aor.formation_id not in unit_ids:
+                raise ValueError(
+                    f"AOR {aor.id} formation_id {aor.formation_id} is not a unit"
                 )

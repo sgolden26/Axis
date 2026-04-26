@@ -29,6 +29,18 @@ from axis.domain.country import (
     Treaty,
 )
 from axis.domain.faction import Faction
+from axis.domain.frontline import Frontline
+from axis.domain.military_assets import (
+    Airfield,
+    AreaOfResponsibility,
+    BorderCrossing,
+    Depot,
+    IsrCoverage,
+    MissileRange,
+    NavalBase,
+    SupplyLine,
+)
+from axis.domain.oblast import Oblast
 from axis.domain.territory import Territory
 from axis.domain.theater import Theater
 from axis.units.base import Unit
@@ -61,7 +73,17 @@ class SnapshotExporter:
             "countries": [self._country(c) for c in t.countries],
             "cities": [self._city(c) for c in t.cities],
             "territories": [self._territory(p) for p in t.territories],
+            "oblasts": [self._oblast(o) for o in t.oblasts],
             "units": [self._unit(u) for u in t.units],
+            "depots": [self._depot(d) for d in t.depots],
+            "airfields": [self._airfield(a) for a in t.airfields],
+            "naval_bases": [self._naval_base(n) for n in t.naval_bases],
+            "border_crossings": [self._crossing(x) for x in t.border_crossings],
+            "supply_lines": [self._supply_line(s) for s in t.supply_lines],
+            "isr_coverages": [self._isr(i) for i in t.isr_coverages],
+            "missile_ranges": [self._missile(m) for m in t.missile_ranges],
+            "aors": [self._aor(a) for a in t.aors],
+            "frontlines": [self._frontline(f) for f in t.frontlines],
             "actions": action_catalog_to_dict(self._actions),
         }
 
@@ -290,3 +312,172 @@ class SnapshotExporter:
             "land_borders": [cls._border(b) for b in g.land_borders],
             "key_bases": [cls._key_base(k) for k in g.key_bases],
         }
+
+    # ---------------------------------------------------------------------
+    # v0.4.0: oblasts, frontline, geospatial military assets
+    # ---------------------------------------------------------------------
+
+    @staticmethod
+    def _oblast(o: Oblast) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "id": o.id,
+            "iso_3166_2": o.iso_3166_2,
+            "name": o.name,
+            "country_id": o.country_id,
+            "faction_id": o.faction_id,
+            "population": o.population,
+            "area_km2": o.area_km2,
+            "control": o.control,
+            "contested": o.contested,
+            "morale": o.morale,
+            "civil_unrest": o.civil_unrest,
+            "refugees_outflow": o.refugees_outflow,
+            "available_actions": list(o.available_actions),
+        }
+        if o.capital_city_id is not None:
+            out["capital_city_id"] = o.capital_city_id
+        if o.centroid is not None:
+            out["centroid"] = [o.centroid.lon, o.centroid.lat]
+        return out
+
+    @staticmethod
+    def _depot(d: Depot) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "id": d.id,
+            "name": d.name,
+            "faction_id": d.faction_id,
+            "position": [d.position.lon, d.position.lat],
+            "capacity": d.capacity,
+            "fill": d.fill,
+            "available_actions": list(d.available_actions),
+        }
+        if d.country_id is not None:
+            out["country_id"] = d.country_id
+        return out
+
+    @staticmethod
+    def _airfield(a: Airfield) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "id": a.id,
+            "name": a.name,
+            "faction_id": a.faction_id,
+            "position": [a.position.lon, a.position.lat],
+            "runway_m": a.runway_m,
+            "role": a.role,
+            "based_aircraft": a.based_aircraft,
+            "available_actions": list(a.available_actions),
+        }
+        if a.country_id is not None:
+            out["country_id"] = a.country_id
+        return out
+
+    @staticmethod
+    def _naval_base(n: NavalBase) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "id": n.id,
+            "name": n.name,
+            "faction_id": n.faction_id,
+            "position": [n.position.lon, n.position.lat],
+            "pier_count": n.pier_count,
+            "home_port_for": list(n.home_port_for),
+            "available_actions": list(n.available_actions),
+        }
+        if n.country_id is not None:
+            out["country_id"] = n.country_id
+        return out
+
+    @staticmethod
+    def _crossing(c: BorderCrossing) -> dict[str, Any]:
+        return {
+            "id": c.id,
+            "name": c.name,
+            "faction_id": c.faction_id,
+            "position": [c.position.lon, c.position.lat],
+            "countries": list(c.countries),
+            "mode": c.mode.value,
+            "rail": c.rail,
+            "road": c.road,
+            "available_actions": list(c.available_actions),
+        }
+
+    @staticmethod
+    def _supply_line(s: SupplyLine) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "id": s.id,
+            "name": s.name,
+            "faction_id": s.faction_id,
+            "path": [[p.lon, p.lat] for p in s.path],
+            "health": s.health,
+            "mode": s.mode,
+            "available_actions": list(s.available_actions),
+        }
+        if s.from_id is not None:
+            out["from_id"] = s.from_id
+        if s.to_id is not None:
+            out["to_id"] = s.to_id
+        return out
+
+    @staticmethod
+    def _isr(i: IsrCoverage) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "id": i.id,
+            "name": i.name,
+            "faction_id": i.faction_id,
+            "origin": [i.origin.lon, i.origin.lat],
+            "range_km": i.range_km,
+            "heading_deg": i.heading_deg,
+            "beam_deg": i.beam_deg,
+            "platform": i.platform,
+            "confidence": i.confidence,
+            "available_actions": list(i.available_actions),
+        }
+        if i.country_id is not None:
+            out["country_id"] = i.country_id
+        return out
+
+    @staticmethod
+    def _missile(m: MissileRange) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "id": m.id,
+            "name": m.name,
+            "faction_id": m.faction_id,
+            "origin": [m.origin.lon, m.origin.lat],
+            "range_km": m.range_km,
+            "weapon": m.weapon,
+            "category": m.category,
+            "heading_deg": m.heading_deg,
+            "beam_deg": m.beam_deg,
+            "available_actions": list(m.available_actions),
+        }
+        if m.country_id is not None:
+            out["country_id"] = m.country_id
+        return out
+
+    @staticmethod
+    def _aor(a: AreaOfResponsibility) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "id": a.id,
+            "name": a.name,
+            "faction_id": a.faction_id,
+            "polygon": [[[pt.lon, pt.lat] for pt in ring] for ring in a.polygon],
+            "available_actions": list(a.available_actions),
+        }
+        if a.formation_id is not None:
+            out["formation_id"] = a.formation_id
+        if a.country_id is not None:
+            out["country_id"] = a.country_id
+        return out
+
+    @staticmethod
+    def _frontline(f: Frontline) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "id": f.id,
+            "name": f.name,
+            "path": [[p.lon, p.lat] for p in f.path],
+            "buffer_km": f.buffer_km,
+            "notes": f.notes,
+            "available_actions": list(f.available_actions),
+        }
+        if f.updated_at is not None:
+            out["updated_at"] = f.updated_at.isoformat()
+        return out
