@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl, { Map as MlMap, MapGeoJSONFeature } from "maplibre-gl";
 import { useAppStore, type LayerKey } from "@/state/store";
 import type {
@@ -6,7 +6,6 @@ import type {
   Selection,
   SelectableKind,
 } from "@/types/scenario";
-import type { RegionIntel } from "@/types/intel";
 import { loadBorders, type BordersBundle } from "@/api/loadBorders";
 import { setMapInstance } from "./mapRef";
 import {
@@ -83,18 +82,21 @@ import {
   SOURCE_SUPPLY,
 } from "./layers/supplyLayer";
 
+// Ordered top-most first. queryRenderedFeatures returns features in render order
+// (top -> bottom); we keep this list aligned with the layer paint order in
+// addOrUpdateData so the topmost hit (unit > city > asset > ... > country) wins.
 const CLICKABLE_LAYERS = [
   LAYER_UNIT_GLYPH,
   LAYER_UNIT_DOT,
   LAYER_UNIT_HALO,
   LAYER_CITY_DOT,
   LAYER_CITY_HALO,
-  LAYER_ASSET_DOT,
   LAYER_ASSET_LABEL,
-  LAYER_OBLAST_FILL,
+  LAYER_ASSET_DOT,
   LAYER_FRONTLINE_LINE,
-  LAYER_FRONTLINE_BUFFER,
   LAYER_SUPPLY_DASH,
+  LAYER_FRONTLINE_BUFFER,
+  LAYER_OBLAST_FILL,
   LAYER_COUNTRY_FILL,
 ];
 
@@ -124,7 +126,6 @@ export function MapView() {
   const selectionRef = useRef<Selection>(null);
 
   const scenario = useAppStore((s) => s.scenario);
-  const intel = useAppStore((s) => s.intel);
   const selection = useAppStore((s) => s.selection);
   const visibleLayers = useAppStore((s) => s.visibleLayers);
   const select = useAppStore((s) => s.select);
@@ -133,14 +134,6 @@ export function MapView() {
   const pushMeasurePoint = useAppStore((s) => s.pushMeasurePoint);
 
   const [borders, setBorders] = useState<BordersBundle | null>(null);
-
-  const intelByRegion = useMemo(() => {
-    const map = new Map<string, RegionIntel>();
-    if (intel) {
-      for (const r of intel.regions) map.set(r.region_id, r);
-    }
-    return map;
-  }, [intel]);
 
   const oblastsOn = visibleLayers.oblasts;
 
@@ -177,24 +170,22 @@ export function MapView() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !scenario || !borders) return;
-    const apply = () => addOrUpdateData(map, scenario, borders, intelByRegion);
+    const apply = () => addOrUpdateData(map, scenario, borders);
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
-  }, [scenario, borders, intelByRegion]);
+  }, [scenario, borders]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !scenario) return;
 
-    const onClick = (
-      ev: maplibregl.MapMouseEvent & { features?: MapGeoJSONFeature[] },
-    ) => {
-      if (useAppStore.getState().measureActive) return;
-      const feat = ev.features?.[0];
-      if (!feat) return;
-      const id = feat.properties?.id as string | undefined;
-      if (!id) return;
+    const activeLayers = () => CLICKABLE_LAYERS.filter((l) => map.getLayer(l));
 
+    const resolveFeature = (
+      feat: MapGeoJSONFeature,
+    ): { kind: SelectableKind; id: string } | null => {
+      const id = feat.properties?.id as string | undefined;
+      if (!id) return null;
       let kind: SelectableKind | undefined;
       if (feat.source === SOURCE_ASSETS) {
         const assetKind = String(feat.properties?.kind ?? "");
@@ -202,26 +193,48 @@ export function MapView() {
       } else {
         kind = SOURCE_TO_KIND[feat.source];
       }
-      if (!kind) return;
-      select({ kind, id });
+      if (!kind) return null;
+      return { kind, id };
     };
 
-    const onMouseEnter = () => {
-      map.getCanvas().style.cursor = "pointer";
+    // queryRenderedFeatures returns features in render order (top-most first),
+    // so a unit drawn over a country fill wins over the country.
+    const topFeature = (point: maplibregl.PointLike): MapGeoJSONFeature | null => {
+      const features = map.queryRenderedFeatures(point, { layers: activeLayers() });
+      return features[0] ?? null;
     };
-    const onMouseLeave = () => {
-      map.getCanvas().style.cursor = "";
-      if (hoverRef.current) {
-        map.setFeatureState(hoverRef.current, { hover: false });
-        hoverRef.current = null;
+
+    const onClick = (ev: maplibregl.MapMouseEvent) => {
+      if (useAppStore.getState().measureActive) {
+        pushMeasurePoint({ lon: ev.lngLat.lng, lat: ev.lngLat.lat });
+        return;
       }
-      setHover(null);
+      const feat = topFeature(ev.point);
+      if (!feat) {
+        useAppStore.getState().clearSelection();
+        return;
+      }
+      const resolved = resolveFeature(feat);
+      if (!resolved) {
+        useAppStore.getState().clearSelection();
+        return;
+      }
+      select(resolved);
     };
-    const onMouseMove = (
-      ev: maplibregl.MapMouseEvent & { features?: MapGeoJSONFeature[] },
-    ) => {
-      const feat = ev.features?.[0];
-      if (!feat || feat.id == null) return;
+
+    const onMouseMove = (ev: maplibregl.MapMouseEvent) => {
+      if (useAppStore.getState().measureActive) return;
+      const feat = topFeature(ev.point);
+      if (!feat || feat.id == null) {
+        if (hoverRef.current) {
+          map.setFeatureState(hoverRef.current, { hover: false });
+          hoverRef.current = null;
+        }
+        map.getCanvas().style.cursor = "";
+        setHover(null);
+        return;
+      }
+      map.getCanvas().style.cursor = "pointer";
       const next: HoverState = { source: feat.source, id: feat.id };
       if (
         hoverRef.current &&
@@ -232,48 +245,29 @@ export function MapView() {
       map.setFeatureState(next, { hover: true });
       hoverRef.current = next;
 
-      const id = feat.properties?.id as string | undefined;
-      let kind: SelectableKind | undefined;
-      if (feat.source === SOURCE_ASSETS) {
-        const assetKind = String(feat.properties?.kind ?? "");
-        kind = ASSET_KIND_TO_SELECTABLE[assetKind];
-      } else {
-        kind = SOURCE_TO_KIND[feat.source];
-      }
-      if (id && kind) {
-        setHover({ kind, id, x: ev.point.x, y: ev.point.y });
+      const resolved = resolveFeature(feat);
+      if (resolved) {
+        setHover({ ...resolved, x: ev.point.x, y: ev.point.y });
       }
     };
 
-    const onMapClickEmpty = (ev: maplibregl.MapMouseEvent) => {
-      if (useAppStore.getState().measureActive) {
-        pushMeasurePoint({ lon: ev.lngLat.lng, lat: ev.lngLat.lat });
-        return;
+    const onMouseOut = () => {
+      if (hoverRef.current) {
+        map.setFeatureState(hoverRef.current, { hover: false });
+        hoverRef.current = null;
       }
-      const features = map.queryRenderedFeatures(ev.point, {
-        layers: CLICKABLE_LAYERS.filter((l) => map.getLayer(l)),
-      });
-      if (features.length === 0) {
-        useAppStore.getState().clearSelection();
-      }
+      map.getCanvas().style.cursor = "";
+      setHover(null);
     };
 
-    for (const layer of CLICKABLE_LAYERS) {
-      map.on("click", layer, onClick);
-      map.on("mouseenter", layer, onMouseEnter);
-      map.on("mouseleave", layer, onMouseLeave);
-      map.on("mousemove", layer, onMouseMove);
-    }
-    map.on("click", onMapClickEmpty);
+    map.on("click", onClick);
+    map.on("mousemove", onMouseMove);
+    map.on("mouseout", onMouseOut);
 
     return () => {
-      for (const layer of CLICKABLE_LAYERS) {
-        map.off("click", layer, onClick);
-        map.off("mouseenter", layer, onMouseEnter);
-        map.off("mouseleave", layer, onMouseLeave);
-        map.off("mousemove", layer, onMouseMove);
-      }
-      map.off("click", onMapClickEmpty);
+      map.off("click", onClick);
+      map.off("mousemove", onMouseMove);
+      map.off("mouseout", onMouseOut);
     };
   }, [scenario, select, setHover, pushMeasurePoint]);
 
@@ -305,21 +299,21 @@ export function MapView() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    let raf = 0;
-    let phase = 0;
-    const tick = () => {
-      phase = (phase + 0.3) % 64;
-      if (map.getLayer(LAYER_SUPPLY_DASH)) {
-        const d = (phase % 4) - 2;
-        map.setPaintProperty(LAYER_SUPPLY_DASH, "line-dasharray", [
-          0.5,
-          1.5 + Math.abs(d) * 0.3,
-        ]);
-      }
-      raf = window.requestAnimationFrame(tick);
-    };
-    raf = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(raf);
+    // Quantised dash patterns + slow tick to keep MapLibre's finite line atlas bounded;
+    // animating line-dasharray every frame with continuous values overflows it.
+    const DASHES: [number, number][] = [
+      [0.5, 1.5],
+      [0.5, 1.7],
+      [0.5, 1.9],
+      [0.5, 2.1],
+    ];
+    let i = 0;
+    const id = window.setInterval(() => {
+      if (!map.getLayer(LAYER_SUPPLY_DASH)) return;
+      map.setPaintProperty(LAYER_SUPPLY_DASH, "line-dasharray", DASHES[i]);
+      i = (i + 1) % DASHES.length;
+    }, 200);
+    return () => window.clearInterval(id);
   }, []);
 
   useEffect(() => {
@@ -505,7 +499,6 @@ function addOrUpdateData(
   map: MlMap,
   scenario: ScenarioSnapshot,
   borders: BordersBundle,
-  intelByRegion: Map<string, RegionIntel>,
 ) {
   const factionsById = new Map(scenario.factions.map((f) => [f.id, f]));
 
@@ -533,9 +526,6 @@ function addOrUpdateData(
   const frontlineLine = frontlineLineCollection(scenario.frontlines);
   const frontlineBuf = frontlineBufferCollection(scenario.frontlines);
   const supply = supplyFeatureCollection(scenario.supply_lines, factionsById);
-
-  // Reference intel feed for future overlays; currently informational only.
-  void intelByRegion;
 
   upsertGeoJsonSource(map, SOURCE_COUNTRY_CONTEXT, context, false);
   upsertGeoJsonSource(map, SOURCE_COUNTRIES, withStringIds(countries));
@@ -632,47 +622,38 @@ function applyLayerVisibility(map: MlMap, vis: Record<LayerKey, boolean>) {
     vis.depots || vis.airfields || vis.naval_bases || vis.border_crossings;
   set(LAYER_ASSET_DOT, anyAsset);
   set(LAYER_ASSET_LABEL, anyAsset);
-  if (map.getLayer(LAYER_ASSET_DOT)) {
-    map.setFilter(LAYER_ASSET_DOT, [
+  // Empty `in` + `["literal", []]` breaks MapLibre symbol draw (null `.width`); skip setFilter when nothing is on.
+  if (anyAsset) {
+    const kinds = (["depot", "airfield", "naval_base", "border_crossing"] as const).filter(
+      assetKindVisible,
+    );
+    const assetFilter: maplibregl.FilterSpecification = [
       "in",
       ["get", "kind"],
-      [
-        "literal",
-        (["depot", "airfield", "naval_base", "border_crossing"] as const).filter(
-          assetKindVisible,
-        ),
-      ],
-    ] as maplibregl.FilterSpecification);
-  }
-  if (map.getLayer(LAYER_ASSET_LABEL)) {
-    map.setFilter(LAYER_ASSET_LABEL, [
-      "in",
-      ["get", "kind"],
-      [
-        "literal",
-        (["depot", "airfield", "naval_base", "border_crossing"] as const).filter(
-          assetKindVisible,
-        ),
-      ],
-    ] as maplibregl.FilterSpecification);
+      ["literal", kinds],
+    ] as maplibregl.FilterSpecification;
+    if (map.getLayer(LAYER_ASSET_DOT)) map.setFilter(LAYER_ASSET_DOT, assetFilter);
+    if (map.getLayer(LAYER_ASSET_LABEL)) map.setFilter(LAYER_ASSET_LABEL, assetFilter);
   }
 
-  // Unit visibility is per-domain.
-  const unitDomainVisible = (
-    map.getLayer(LAYER_UNIT_DOT) ? true : false
-  );
-  if (unitDomainVisible) {
+  if (map.getLayer(LAYER_UNIT_DOT)) {
     const allowed: string[] = [];
     if (vis.units_ground) allowed.push("ground");
     if (vis.units_air) allowed.push("air");
     if (vis.units_naval) allowed.push("naval");
-    const filter: maplibregl.FilterSpecification = [
-      "in",
-      ["get", "domain"],
-      ["literal", allowed],
-    ] as maplibregl.FilterSpecification;
-    map.setFilter(LAYER_UNIT_DOT, filter);
-    map.setFilter(LAYER_UNIT_HALO, filter);
-    if (map.getLayer(LAYER_UNIT_GLYPH)) map.setFilter(LAYER_UNIT_GLYPH, filter);
+    const showUnits = allowed.length > 0;
+    set(LAYER_UNIT_DOT, showUnits);
+    set(LAYER_UNIT_HALO, showUnits);
+    set(LAYER_UNIT_GLYPH, showUnits);
+    if (showUnits) {
+      const filter: maplibregl.FilterSpecification = [
+        "in",
+        ["get", "domain"],
+        ["literal", allowed],
+      ] as maplibregl.FilterSpecification;
+      map.setFilter(LAYER_UNIT_DOT, filter);
+      map.setFilter(LAYER_UNIT_HALO, filter);
+      if (map.getLayer(LAYER_UNIT_GLYPH)) map.setFilter(LAYER_UNIT_GLYPH, filter);
+    }
   }
 }

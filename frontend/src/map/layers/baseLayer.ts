@@ -57,7 +57,7 @@ export const baseLabelLayer: LayerSpecification = {
   source: SOURCE_COUNTRY_BASES,
   layout: {
     "text-field": ["get", "name"],
-    "text-font": ["Open Sans Regular"],
+    "text-font": ["Open Sans Semibold"],
     "text-size": 9,
     "text-offset": [0, 0.9],
     "text-anchor": "top",

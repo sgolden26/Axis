@@ -108,7 +108,7 @@ export const unitGlyphLayer: LayerSpecification = {
   source: SOURCE_UNITS,
   layout: {
     "text-field": ["get", "glyph"],
-    "text-font": ["Open Sans Regular"],
+    "text-font": ["Open Sans Semibold"],
     "text-size": [
       "interpolate",
       ["linear"],

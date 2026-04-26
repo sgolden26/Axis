@@ -89,7 +89,7 @@ export const cityLabelLayer: LayerSpecification = {
   filter: [">=", ["get", "importance_rank"], 2],
   layout: {
     "text-field": ["get", "name"],
-    "text-font": ["Open Sans Regular"],
+    "text-font": ["Open Sans Semibold"],
     "text-size": 11,
     "text-offset": [0.9, 0],
     "text-anchor": "left",
