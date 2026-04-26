@@ -58,6 +58,13 @@ _TRANSIENT_NET_ERRORS: tuple[type[BaseException], ...] = (
 )
 _RETRY_BACKOFF_S = 1.0
 
+# Brief pause between consecutive region queries on the shared connection.
+# GDELT's free-tier endpoint enforces a per-IP rate limit (we observed HTTP
+# 429s and TLS-level resets on back-to-back requests). 1.5s is conservative
+# enough to clear it while keeping a 14-region batch under ~25s of cumulative
+# pacing overhead, which is well inside the 12h cache TTL anyway.
+_INTER_REGION_DELAY_S = 1.5
+
 
 @dataclass(frozen=True, slots=True)
 class _RegionQuery:
@@ -285,7 +292,10 @@ class GdeltLiveSource(IntelSource):
         n_fail = 0
         state = _ConnState(_GDELT_HOST, _GDELT_PORT, self._timeout_s)
         try:
-            for rq in self._regions:
+            for i, rq in enumerate(self._regions):
+                if i > 0:
+                    # Pace requests to stay under GDELT's per-IP throttle.
+                    time.sleep(_INTER_REGION_DELAY_S)
                 try:
                     articles = self._fetch_region(rq, state)
                 except RuntimeError as exc:
