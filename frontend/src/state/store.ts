@@ -77,6 +77,8 @@ interface AppState {
 
   rightTab: RightTab;
   rightPanelOpen: boolean;
+  /** Full-viewport decision workspace (map behind overlay; PIP + thin ticker). */
+  decisionImmersiveOpen: boolean;
   leftDockOpen: boolean;
   oobExpanded: Record<string, boolean>;
   bookmarks: Bookmark[];
@@ -101,6 +103,7 @@ interface AppState {
   clearRosterCompare: () => void;
   setRightTab: (t: RightTab) => void;
   setRightPanelOpen: (open: boolean) => void;
+  setDecisionImmersiveOpen: (open: boolean) => void;
   setLeftDockOpen: (open: boolean) => void;
   toggleOobNode: (id: string) => void;
   setOobExpanded: (id: string, on: boolean) => void;
@@ -146,6 +149,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   rightTab: "context",
   rightPanelOpen: true,
+  decisionImmersiveOpen: false,
   leftDockOpen: true,
   oobExpanded: {},
   bookmarks: [],
@@ -165,11 +169,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ intel: snapshot, intelError: null, lastIntelLoadAt: Date.now() }),
   setIntelError: (e) => set({ intelError: e }),
   select: (sel) =>
-    set(() => ({
-      selection: sel,
-      rightPanelOpen: true,
-      rightTab: "context",
-    })),
+    set((state) => {
+      if (state.rightTab === "decision") {
+        return { selection: sel, rightPanelOpen: true };
+      }
+      return {
+        selection: sel,
+        rightPanelOpen: true,
+        rightTab: "context",
+        decisionImmersiveOpen: false,
+      };
+    }),
   clearSelection: () => set({ selection: null }),
   setHover: (h) => set({ hover: h }),
   toggleLayer: (k) =>
@@ -195,8 +205,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { rosterCompareIds: [...state.rosterCompareIds, countryId] };
     }),
   clearRosterCompare: () => set({ rosterCompareIds: [] }),
-  setRightTab: (t) => set({ rightTab: t, rightPanelOpen: true }),
+  setRightTab: (t) =>
+    set({
+      rightTab: t,
+      rightPanelOpen: true,
+      decisionImmersiveOpen: t === "decision",
+    }),
   setRightPanelOpen: (open) => set({ rightPanelOpen: open }),
+  setDecisionImmersiveOpen: (open) => set({ decisionImmersiveOpen: open }),
   setLeftDockOpen: (open) => set({ leftDockOpen: open }),
   toggleOobNode: (id) =>
     set((state) => ({

@@ -1,9 +1,10 @@
 import type { RegionIntel } from "@/types/intel";
-import type { Faction, Territory } from "@/types/scenario";
+import type { Faction, Oblast, Territory } from "@/types/scenario";
 
 interface Props {
   regions: RegionIntel[];
   territoriesById: Map<string, Territory>;
+  oblastsById: Map<string, Oblast>;
   factionsById: Map<string, Faction>;
   selectedRegionId: string | null;
   onSelect: (territoryId: string) => void;
@@ -21,6 +22,7 @@ function moraleColor(score: number): string {
 export function RegionList({
   regions,
   territoriesById,
+  oblastsById,
   factionsById,
   selectedRegionId,
   onSelect,
@@ -33,7 +35,12 @@ export function RegionList({
       <ul className="mt-2 flex flex-col gap-1">
         {regions.map((r) => {
           const t = territoriesById.get(r.region_id);
-          const f = t ? factionsById.get(t.faction_id) : undefined;
+          const o = oblastsById.get(r.region_id);
+          const f = t
+            ? factionsById.get(t.faction_id)
+            : o
+              ? factionsById.get(o.faction_id)
+              : undefined;
           const active = r.region_id === selectedRegionId;
           const color = moraleColor(r.morale_score);
           return (
@@ -49,7 +56,7 @@ export function RegionList({
               >
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[12px] text-ink-50">
-                    {t?.name ?? r.region_id}
+                    {t?.name ?? o?.name ?? r.region_id}
                   </div>
                   <div className="font-mono text-[9px] uppercase tracking-wider2 text-ink-200">
                     {f?.name ?? "—"}

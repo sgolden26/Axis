@@ -6,6 +6,8 @@ import { ActionPicker } from "./ActionPicker";
 import { OutcomeCard } from "./OutcomeCard";
 import { RegionList } from "./RegionList";
 import { RegionSummary } from "./RegionSummary";
+import { DecisionStatusBadge } from "./DecisionStatusBadge";
+import { resolveRegionEntity } from "@/decision/resolveRegionEntity";
 
 export function DecisionEngine() {
   const scenario = useAppStore((s) => s.scenario);
@@ -33,10 +35,20 @@ export function DecisionEngine() {
     return map;
   }, [scenario]);
 
-  const focusedRegionId =
-    selection?.kind === "territory"
-      ? selection.id
-      : intel?.regions[0]?.region_id ?? null;
+  const oblastsById = useMemo(() => {
+    const map = new Map<string, NonNullable<typeof scenario>["oblasts"][number]>();
+    if (scenario) {
+      for (const o of scenario.oblasts) map.set(o.id, o);
+    }
+    return map;
+  }, [scenario]);
+
+  const focusedRegionId = useMemo(() => {
+    if (!intel) return null;
+    if (selection?.kind === "territory") return selection.id;
+    if (selection?.kind === "oblast") return selection.id;
+    return intel.regions[0]?.region_id ?? null;
+  }, [intel, selection]);
 
   const focusedRegion = useMemo(() => {
     if (!intel || !focusedRegionId) return null;
@@ -53,9 +65,14 @@ export function DecisionEngine() {
     return evaluate(selectedAction, focusedRegion);
   }, [selectedAction, focusedRegion]);
 
+  const resolvedEntity = useMemo(() => {
+    if (!scenario || !focusedRegion) return null;
+    return resolveRegionEntity(scenario, focusedRegion.region_id);
+  }, [scenario, focusedRegion]);
+
   return (
-    <div className="flex h-full flex-col bg-ink-800">
-      <div className="hairline-b flex items-center justify-between px-4 py-2">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col bg-ink-800">
+      <div className="hairline-b flex shrink-0 items-center justify-between px-4 py-2">
         <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
           decision engine
         </span>
@@ -68,7 +85,7 @@ export function DecisionEngine() {
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="h-0 min-h-0 flex-1 overflow-y-auto">
         {!scenario ? (
           <div className="px-4 py-8 text-center font-mono text-[11px] text-ink-200">
             waiting for scenario…
@@ -86,6 +103,7 @@ export function DecisionEngine() {
             <RegionList
               regions={intel.regions}
               territoriesById={territoriesById}
+              oblastsById={oblastsById}
               factionsById={factionsById}
               selectedRegionId={focusedRegionId}
               onSelect={(id) => {
@@ -95,15 +113,11 @@ export function DecisionEngine() {
               }}
             />
 
-            {focusedRegion && territoriesById.get(focusedRegion.region_id) && (
+            {focusedRegion && resolvedEntity && (
               <RegionSummary
                 region={focusedRegion}
-                territory={territoriesById.get(focusedRegion.region_id)!}
-                faction={
-                  factionsById.get(
-                    territoriesById.get(focusedRegion.region_id)!.faction_id,
-                  )!
-                }
+                regionLabel={resolvedEntity.name}
+                faction={resolvedEntity.faction}
               />
             )}
 
@@ -120,43 +134,5 @@ export function DecisionEngine() {
         )}
       </div>
     </div>
-  );
-}
-
-function DecisionStatusBadge({
-  intelLoaded,
-  intelError,
-  lastIntelLoadAt,
-  source,
-  tickSeq,
-}: {
-  intelLoaded: boolean;
-  intelError: string | null;
-  lastIntelLoadAt: number | null;
-  source: string | null;
-  tickSeq: number | null;
-}) {
-  if (intelError) {
-    return (
-      <span className="font-mono text-[10px] uppercase tracking-wider2 text-accent-danger">
-        offline
-      </span>
-    );
-  }
-  if (!intelLoaded) {
-    return (
-      <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
-        warming up…
-      </span>
-    );
-  }
-  const ago = lastIntelLoadAt
-    ? Math.max(0, Math.round((Date.now() - lastIntelLoadAt) / 1000))
-    : 0;
-  return (
-    <span className="font-mono text-[10px] uppercase tracking-wider2 text-accent-ok">
-      live · {source ?? "?"}
-      {tickSeq != null && tickSeq > 0 ? ` #${tickSeq}` : ""} · {ago}s
-    </span>
   );
 }

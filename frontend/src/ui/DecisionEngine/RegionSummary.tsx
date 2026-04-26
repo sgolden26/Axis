@@ -1,5 +1,5 @@
 import type { IntelEvent, RegionIntel } from "@/types/intel";
-import type { Faction, Territory } from "@/types/scenario";
+import type { Faction } from "@/types/scenario";
 import { Sparkline } from "./Sparkline";
 
 function hostname(url: string): string {
@@ -28,7 +28,8 @@ function SourceLink({ url }: { url: string }) {
 
 interface Props {
   region: RegionIntel;
-  territory: Territory;
+  /** Oblast or territory display name. */
+  regionLabel: string;
   faction: Faction;
 }
 
@@ -61,7 +62,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   nationalist_sentiment: "Nationalism",
 };
 
-export function RegionSummary({ region, territory, faction }: Props) {
+export function RegionSummary({ region, regionLabel, faction }: Props) {
   const tone = moraleTone(region.morale_score);
   const score = Math.round(region.morale_score);
   const trendSign = region.trend_delta >= 0 ? "+" : "";
@@ -81,7 +82,7 @@ export function RegionSummary({ region, territory, faction }: Props) {
           <span style={{ color: faction.color }}>{faction.name}</span>
         </div>
         <div className="mt-1 text-base font-semibold text-ink-50">
-          {territory.name}
+          {regionLabel}
         </div>
 
         <div className="mt-3 flex items-end justify-between gap-3">

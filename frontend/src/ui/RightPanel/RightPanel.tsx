@@ -52,7 +52,7 @@ export function RightPanel() {
           ›
         </button>
       </div>
-      <div className="flex-1 overflow-hidden">
+      <div className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
         {tab === "context" ? <Sidebar /> : <DecisionEngine />}
       </div>
     </aside>

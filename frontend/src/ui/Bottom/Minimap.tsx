@@ -2,13 +2,32 @@ import { useEffect, useRef } from "react";
 import maplibregl, { Map as MlMap } from "maplibre-gl";
 import { baseStyle } from "@/map/style";
 import { getMapInstance, subscribeMap } from "@/map/mapRef";
+import { useAppStore } from "@/state/store";
 
-export function Minimap() {
+interface MinimapProps {
+  /** Replaces the default lower-right slot when set. */
+  className?: string;
+  /** Second minimap (PIP) in decision workspace; main minimap is hidden while immersive. */
+  variant?: "default" | "pip";
+}
+
+export function Minimap({ className, variant = "default" }: MinimapProps) {
+  const decisionImmersive = useAppStore((s) => s.decisionImmersiveOpen);
   const containerRef = useRef<HTMLDivElement>(null);
   const miniRef = useRef<MlMap | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
 
+  /** Must not return before hooks — only main minimap hides while decision workspace is open. */
+  const skipDefault = variant === "default" && decisionImmersive;
+
   useEffect(() => {
+    if (skipDefault) {
+      if (miniRef.current) {
+        miniRef.current.remove();
+        miniRef.current = null;
+      }
+      return;
+    }
     if (!containerRef.current || miniRef.current) return;
     const mini = new maplibregl.Map({
       container: containerRef.current,
@@ -23,9 +42,11 @@ export function Minimap() {
       mini.remove();
       miniRef.current = null;
     };
-  }, []);
+  }, [skipDefault]);
 
   useEffect(() => {
+    if (skipDefault) return;
+
     let main: MlMap | null = null;
 
     const onMove = () => {
@@ -36,7 +57,7 @@ export function Minimap() {
       const left = Math.min(sw.x, ne.x);
       const top = Math.min(sw.y, ne.y);
       const width = Math.abs(ne.x - sw.x);
-      const height = Math.abs(sw.y - ne.y);
+      const height = Math.abs(ne.y - sw.y);
       const box = boxRef.current;
       box.style.left = `${left}px`;
       box.style.top = `${top}px`;
@@ -65,7 +86,7 @@ export function Minimap() {
         main.off("zoom", onMove);
       }
     };
-  }, []);
+  }, [skipDefault]);
 
   const onClick = (ev: React.MouseEvent<HTMLDivElement>) => {
     if (!miniRef.current) return;
@@ -77,8 +98,16 @@ export function Minimap() {
     if (main) main.easeTo({ center: [lngLat.lng, lngLat.lat], duration: 300 });
   };
 
+  const shell =
+    className ??
+    (variant === "pip"
+      ? "hairline relative h-40 w-56 overflow-hidden border border-ink-500 bg-ink-900/90"
+      : "hairline absolute bottom-12 right-3 h-32 w-48 overflow-hidden border border-ink-500 bg-ink-900/90");
+
+  if (skipDefault) return null;
+
   return (
-    <div className="hairline absolute bottom-12 right-3 h-32 w-48 overflow-hidden border border-ink-500 bg-ink-900/90">
+    <div className={shell}>
       <div ref={containerRef} className="absolute inset-0" />
       <div
         ref={boxRef}

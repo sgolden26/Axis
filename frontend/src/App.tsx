@@ -11,6 +11,7 @@ import { HoverCard } from "@/ui/HoverCard";
 import { Minimap } from "@/ui/Bottom/Minimap";
 import { BottomBar } from "@/ui/Bottom/BottomBar";
 import { KeyboardShortcuts } from "@/ui/KeyboardShortcuts";
+import { DecisionImmersive } from "@/ui/DecisionEngine/DecisionImmersive";
 
 export function App() {
   const setScenario = useAppStore((s) => s.setScenario);
@@ -66,6 +67,7 @@ export function App() {
         <RightPanel />
       </div>
       <BottomBar />
+      <DecisionImmersive />
     </div>
   );
 }

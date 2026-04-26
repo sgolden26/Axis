@@ -20,7 +20,8 @@ export function KeyboardShortcuts() {
           s.setRightPanelOpen(!s.rightPanelOpen);
           break;
         case "Escape":
-          if (s.measureActive) s.setMeasureActive(false);
+          if (s.decisionImmersiveOpen) s.setDecisionImmersiveOpen(false);
+          else if (s.measureActive) s.setMeasureActive(false);
           else if (s.selection) s.clearSelection();
           else if (s.showHelp) s.setShowHelp(false);
           break;
@@ -63,7 +64,7 @@ export function KeyboardShortcuts() {
 
   if (!showHelp) return null;
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-ink-900/70">
+    <div className="absolute inset-0 z-[60] flex items-center justify-center bg-ink-900/70">
       <div className="hairline border border-ink-500 bg-ink-800 p-4">
         <div className="mb-2 flex items-center justify-between">
           <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
@@ -83,7 +84,7 @@ export function KeyboardShortcuts() {
               ["]", "Toggle right panel"],
               ["M", "Measure tool"],
               ["B", "Bookmark current view"],
-              ["Esc", "Cancel / clear selection"],
+              ["Esc", "Close decision workspace / measure / clear selection"],
               ["?", "This help"],
             ].map(([k, v]) => (
               <tr key={k}>

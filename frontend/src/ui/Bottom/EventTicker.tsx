@@ -18,7 +18,7 @@ const CATEGORY_TONE: Record<IntelEvent["category"], string> = {
   nationalist_sentiment: "text-ink-100",
 };
 
-export function EventTicker() {
+export function EventTicker({ thin = false }: { thin?: boolean }) {
   const intel = useAppStore((s) => s.intel);
   const paused = useAppStore((s) => s.tickerPaused);
   const setPaused = useAppStore((s) => s.setTickerPaused);
@@ -50,22 +50,38 @@ export function EventTicker() {
   };
 
   return (
-    <div className="hairline-t flex h-9 items-center gap-3 bg-ink-900/95 px-3">
+    <div
+      className={
+        thin
+          ? "hairline-t flex h-5 items-center gap-2 bg-ink-900/95 px-2"
+          : "hairline-t flex h-9 items-center gap-3 bg-ink-900/95 px-3"
+      }
+    >
       <button
         onClick={() => setPaused(!paused)}
-        className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200 hover:text-ink-50"
+        className={
+          thin
+            ? "shrink-0 font-mono text-[8px] uppercase tracking-wider2 text-ink-200 hover:text-ink-50"
+            : "font-mono text-[10px] uppercase tracking-wider2 text-ink-200 hover:text-ink-50"
+        }
         title="Pause ticker"
       >
         {paused ? "▶" : "‖"}
       </button>
-      <span className="font-mono text-[9px] uppercase tracking-wider2 text-ink-200">
+      <span
+        className={
+          thin
+            ? "shrink-0 font-mono text-[8px] uppercase tracking-wider2 text-ink-200"
+            : "font-mono text-[9px] uppercase tracking-wider2 text-ink-200"
+        }
+      >
         ticker · {intel?.source ?? "—"}
       </span>
-      <div className="relative flex-1 overflow-hidden">
+      <div className="relative min-w-0 flex-1 overflow-hidden">
         <div
-          className={`flex gap-6 whitespace-nowrap font-mono text-[11px] text-ink-100 ${
-            paused ? "" : "animate-ticker"
-          }`}
+          className={`flex gap-3 whitespace-nowrap text-ink-100 ${
+            thin ? "gap-3 font-mono text-[8px]" : "gap-6 font-mono text-[11px]"
+          } ${paused ? "" : "animate-ticker"}`}
           style={{ minWidth: "200%" }}
         >
           {[...events, ...events].map((ev, i) => (
