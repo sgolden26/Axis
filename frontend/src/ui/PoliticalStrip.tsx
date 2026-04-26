@@ -26,8 +26,8 @@ export function PoliticalStrip() {
       : null;
 
   return (
-    <div className="hairline-b flex h-8 shrink-0 items-stretch bg-ink-800/95">
-      <div className="flex items-center gap-3 px-4 font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+    <div className="hairline-b flex h-9 shrink-0 items-stretch whitespace-nowrap bg-ink-800/95">
+      <div className="flex shrink-0 items-center gap-3 px-4 font-mono text-[10px] uppercase tracking-wider2 leading-none text-ink-200">
         <span
           className="text-ink-100"
           title="Feeds the decision engine as issuer pressure and deadline (T-N)."
@@ -48,7 +48,7 @@ export function PoliticalStrip() {
         )}
       </div>
 
-      <div className="hairline-l flex min-w-0 flex-1 items-center gap-4 overflow-x-auto px-4">
+      <div className="hairline-l flex min-w-0 flex-1 items-center gap-4 overflow-x-auto px-4 leading-none">
         {factionPressures.map((fp) => {
           const faction = factionsById.get(fp.faction_id);
           if (!faction) return null;
@@ -118,7 +118,7 @@ function FactionPressurePip({
 
   return (
     <div
-      className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider2"
+      className="flex shrink-0 items-center gap-2 whitespace-nowrap font-mono text-[10px] uppercase leading-none tracking-wider2"
       title={driverTitle}
     >
       <span style={{ color: faction.color }} className="font-semibold">
@@ -133,7 +133,7 @@ function FactionPressurePip({
           </span>
           <span className="text-ink-300">·</span>
           <span className="text-ink-200">pressure</span>
-          <div className="h-1.5 w-16 bg-ink-700">
+          <div className="h-1.5 w-16 shrink-0 bg-ink-700">
             <div
               className="h-full"
               style={{ width: `${pct}%`, background: faction.color }}
@@ -143,7 +143,7 @@ function FactionPressurePip({
         </>
       ) : (
         <>
-          <div className="h-1.5 w-24 bg-ink-700">
+          <div className="h-1.5 w-24 shrink-0 bg-ink-700">
             <div
               className="h-full"
               style={{ width: `${pct}%`, background: faction.color }}

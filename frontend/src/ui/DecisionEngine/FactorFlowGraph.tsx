@@ -54,6 +54,21 @@ function truncate(s: string, max: number): string {
   return `${s.slice(0, max - 1)}…`;
 }
 
+/** Wrap a string to two lines, breaking at the last space within max. Line 2
+ *  is truncated with an ellipsis if it still exceeds `max`. */
+function wrapToTwoLines(s: string, max: number): { a: string; b: string } {
+  const trimmed = s.trim();
+  if (trimmed.length <= max) return { a: trimmed, b: "" };
+  const breakAt = trimmed.lastIndexOf(" ", max);
+  if (breakAt < Math.floor(max * 0.5)) {
+    return { a: trimmed.slice(0, max), b: truncate(trimmed.slice(max), max) };
+  }
+  return {
+    a: trimmed.slice(0, breakAt),
+    b: truncate(trimmed.slice(breakAt + 1), max),
+  };
+}
+
 /** Two balanced lines for action node titles (no clipping). */
 function actionTitleLines(name: string): { a: string; b: string } {
   if (name.length <= 20) return { a: name, b: "" };
@@ -240,6 +255,7 @@ export function FactorFlowGraph({
             if (n.kind === "signal") {
               const ev = eventBySignalId.get(n.id);
               const clickable = Boolean(onSignalClick && ev);
+              const { a: sigA, b: sigB } = wrapToTwoLines(n.label, 32);
               return (
                 <g
                   key={n.id}
@@ -251,6 +267,7 @@ export function FactorFlowGraph({
                   }
                   className={clickable ? "cursor-pointer" : undefined}
                 >
+                  <title>{n.label}</title>
                   <rect
                     x={n.x}
                     y={n.y}
@@ -268,11 +285,18 @@ export function FactorFlowGraph({
                     style={{ fontSize: 9, fontFamily: "ui-monospace, monospace" }}
                     pointerEvents="none"
                   >
-                    {truncate(n.label, 36)}
+                    <tspan x={n.x + 6} dy="0">
+                      {sigA}
+                    </tspan>
+                    {sigB ? (
+                      <tspan x={n.x + 6} dy="13">
+                        {sigB}
+                      </tspan>
+                    ) : null}
                   </text>
                   <text
                     x={n.x + 6}
-                    y={n.y + 32}
+                    y={n.y + n.h - 10}
                     className="fill-ink-300"
                     style={{ fontSize: 8, fontFamily: "ui-monospace, monospace" }}
                     pointerEvents="none"
@@ -285,8 +309,10 @@ export function FactorFlowGraph({
             if (n.kind === "factor") {
               const c = n.contribution ?? 0;
               const pos = c >= 0;
+              const { a: facA, b: facB } = wrapToTwoLines(n.label, 36);
               return (
                 <g key={n.id} pointerEvents="none">
+                  <title>{n.label}</title>
                   <rect
                     x={n.x}
                     y={n.y}
@@ -317,11 +343,18 @@ export function FactorFlowGraph({
                   </text>
                   <text
                     x={n.x + 6}
-                    y={n.y + 36}
+                    y={n.y + 34}
                     className="fill-ink-100"
                     style={{ fontSize: 9, fontFamily: "ui-monospace, monospace" }}
                   >
-                    {truncate(n.label, 32)}
+                    <tspan x={n.x + 6} dy="0">
+                      {facA}
+                    </tspan>
+                    {facB ? (
+                      <tspan x={n.x + 6} dy="13">
+                        {facB}
+                      </tspan>
+                    ) : null}
                   </text>
                 </g>
               );
