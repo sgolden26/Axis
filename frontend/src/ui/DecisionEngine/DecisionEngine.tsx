@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useAppStore } from "@/state/store";
 import { evaluate } from "@/decision/evaluator";
+import { buildPoliticalContext } from "@/decision/politicalContext";
 import type { Action } from "@/types/decision";
 import { ActionPicker } from "./ActionPicker";
 import { OutcomeCard } from "./OutcomeCard";
@@ -18,6 +19,7 @@ export function DecisionEngine() {
   const select = useAppStore((s) => s.select);
   const selectedActionId = useAppStore((s) => s.selectedActionId);
   const selectAction = useAppStore((s) => s.selectAction);
+  const playerTeam = useAppStore((s) => s.playerTeam);
 
   const territoriesById = useMemo(() => {
     const map = new Map<string, NonNullable<typeof scenario>["territories"][number]>();
@@ -60,15 +62,21 @@ export function DecisionEngine() {
     return actions.find((a) => a.id === selectedActionId) ?? actions[0] ?? null;
   }, [actions, selectedActionId]);
 
-  const outcome = useMemo(() => {
-    if (!selectedAction || !focusedRegion) return null;
-    return evaluate(selectedAction, focusedRegion);
-  }, [selectedAction, focusedRegion]);
-
   const resolvedEntity = useMemo(() => {
     if (!scenario || !focusedRegion) return null;
     return resolveRegionEntity(scenario, focusedRegion.region_id);
   }, [scenario, focusedRegion]);
+
+  const politicalContext = useMemo(() => {
+    if (!scenario) return undefined;
+    const targetId = resolvedEntity?.faction?.id ?? null;
+    return buildPoliticalContext(scenario, playerTeam, targetId);
+  }, [scenario, playerTeam, resolvedEntity]);
+
+  const outcome = useMemo(() => {
+    if (!selectedAction || !focusedRegion) return null;
+    return evaluate(selectedAction, focusedRegion, politicalContext);
+  }, [selectedAction, focusedRegion, politicalContext]);
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col bg-ink-800">

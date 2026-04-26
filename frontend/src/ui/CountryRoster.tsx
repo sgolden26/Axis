@@ -15,7 +15,8 @@ type SortKey =
   | "alert_level"
   | "war_support"
   | "stability_index"
-  | "posture";
+  | "posture"
+  | "credibility";
 
 const COLUMNS: { key: SortKey; label: string; width: string }[] = [
   { key: "name", label: "Country", width: "1.4fr" },
@@ -24,6 +25,7 @@ const COLUMNS: { key: SortKey; label: string; width: string }[] = [
   { key: "war_support", label: "War sup.", width: "0.9fr" },
   { key: "stability_index", label: "Stability", width: "0.9fr" },
   { key: "posture", label: "Posture", width: "0.9fr" },
+  { key: "credibility", label: "Cred.", width: "0.9fr" },
 ];
 
 const COMPARE_METRICS: ChoroplethMetric[] = [
@@ -54,18 +56,34 @@ export function CountryRoster() {
     return m;
   }, [scenario]);
 
+  const credibilityByFaction = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!scenario) return m;
+    const totals = new Map<string, { sum: number; n: number }>();
+    for (const t of scenario.credibility) {
+      const acc = totals.get(t.from_faction_id) ?? { sum: 0, n: 0 };
+      acc.sum += t.immediate;
+      acc.n += 1;
+      totals.set(t.from_faction_id, acc);
+    }
+    for (const [fid, { sum, n }] of totals) {
+      m.set(fid, n > 0 ? sum / n : 0);
+    }
+    return m;
+  }, [scenario]);
+
   const sorted = useMemo(() => {
     const list = [...(scenario?.countries ?? [])];
     list.sort((a, b) => {
-      const va = sortValue(a, sortKey, factionsById);
-      const vb = sortValue(b, sortKey, factionsById);
+      const va = sortValue(a, sortKey, factionsById, credibilityByFaction);
+      const vb = sortValue(b, sortKey, factionsById, credibilityByFaction);
       if (typeof va === "number" && typeof vb === "number") {
         return (va - vb) * (sortAsc ? 1 : -1);
       }
       return String(va).localeCompare(String(vb)) * (sortAsc ? 1 : -1);
     });
     return list;
-  }, [scenario, sortKey, sortAsc, factionsById]);
+  }, [scenario, sortKey, sortAsc, factionsById, credibilityByFaction]);
 
   const compareCountries = useMemo(
     () => compareIds.map((id) => sorted.find((c) => c.id === id)).filter(Boolean) as Country[],
@@ -167,6 +185,7 @@ export function CountryRoster() {
                   <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-100">
                     {c.military.posture}
                   </span>
+                  <CredibilityCell value={credibilityByFaction.get(c.faction_id) ?? null} />
                   <div className="text-right">
                     <button
                       onClick={() => toggleCompare(c.id)}
@@ -208,6 +227,45 @@ function AlertCell({ value }: { value: number }) {
         />
       ))}
       <span className="ml-1 font-mono text-[10px] text-ink-200">{value}/5</span>
+    </div>
+  );
+}
+
+function CredibilityCell({ value }: { value: number | null }) {
+  if (value == null) {
+    return (
+      <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-300">
+        —
+      </span>
+    );
+  }
+  const pct = Math.round(Math.abs(value) * 100);
+  const tone =
+    value >= 0.2
+      ? "var(--accent-ok)"
+      : value <= -0.2
+        ? "var(--accent-danger)"
+        : "var(--accent-amber)";
+  const sign = value >= 0 ? "+" : "−";
+  // Bar fills from the centre: positive fills right, negative fills left.
+  const half = Math.min(50, pct / 2);
+  return (
+    <div className="flex items-center gap-2" title={`Outgoing immediate credibility (avg)`}>
+      <div className="relative h-1 w-14 bg-ink-700">
+        <div
+          className="absolute top-0 h-full"
+          style={{
+            background: tone,
+            width: `${half}%`,
+            left: value >= 0 ? "50%" : `${50 - half}%`,
+          }}
+        />
+        <div className="absolute top-0 h-full w-px bg-ink-500/60" style={{ left: "50%" }} />
+      </div>
+      <span className="font-mono text-[10px]" style={{ color: tone }}>
+        {sign}
+        {pct}
+      </span>
     </div>
   );
 }
@@ -297,6 +355,7 @@ function sortValue(
   c: Country,
   key: SortKey,
   factionsById: Map<string, Faction>,
+  credibilityByFaction: Map<string, number>,
 ): number | string {
   switch (key) {
     case "name":
@@ -311,5 +370,7 @@ function sortValue(
       return c.government.stability_index;
     case "posture":
       return c.military.posture;
+    case "credibility":
+      return credibilityByFaction.get(c.faction_id) ?? -2;
   }
 }

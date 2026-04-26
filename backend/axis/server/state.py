@@ -14,6 +14,7 @@ from axis.sim.orders import (
     RoundExecutionResult,
     execute_round,
 )
+from axis.sim.political_engine import advance_after_batch
 
 
 class TheaterStore:
@@ -42,10 +43,42 @@ class TheaterStore:
         with self._lock:
             return SnapshotExporter(self._theater).to_dict()
 
+    def political_dict(self) -> dict[str, Any]:
+        """Slice of the snapshot containing only the political layer.
+
+        Used by `GET /api/signals` so the FE can poll the political surface
+        on a faster cadence than the full state.
+        """
+        with self._lock:
+            full = SnapshotExporter(self._theater).to_dict()
+            return {
+                "schema_version": full["schema_version"],
+                "current_turn": full["current_turn"],
+                "pressure": full["pressure"],
+                "credibility": full["credibility"],
+                "leader_signals": full["leader_signals"],
+            }
+
     def apply_batch(self, batch: OrderBatch) -> tuple[ExecutionResult, dict[str, Any]]:
-        """Execute `batch` against the live theatre, returning result + snapshot."""
+        """Execute `batch` against the live theatre, returning result + snapshot.
+
+        On success the political layer advances one turn (credibility update
+        + pressure decay + deadline ramp). Failed batches do not advance the
+        clock so the operator can amend and resubmit without burning a turn.
+        """
         with self._lock:
             result = batch.execute(self._theater)
+            if result.ok:
+                advance_after_batch(self._theater, batch)
+            snapshot = SnapshotExporter(self._theater).to_dict()
+            return result, snapshot
+
+    def apply_round(
+        self, batches: list[OrderBatch]
+    ) -> tuple[RoundExecutionResult, dict[str, Any]]:
+        """Execute a hot-seat round (multiple per-team batches) atomically."""
+        with self._lock:
+            result = execute_round(self._theater, batches)
             snapshot = SnapshotExporter(self._theater).to_dict()
             return result, snapshot
 

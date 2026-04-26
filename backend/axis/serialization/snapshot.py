@@ -41,6 +41,14 @@ from axis.domain.military_assets import (
     SupplyLine,
 )
 from axis.domain.oblast import Oblast
+from axis.domain.political import (
+    CredibilityTrack,
+    FactionPressure,
+    GapEvent,
+    LeaderSignal,
+    PressureState,
+    RegionPressure,
+)
 from axis.domain.territory import Territory
 from axis.domain.theater import Theater
 from axis.units.base import Unit
@@ -84,6 +92,10 @@ class SnapshotExporter:
             "missile_ranges": [self._missile(m) for m in t.missile_ranges],
             "aors": [self._aor(a) for a in t.aors],
             "frontlines": [self._frontline(f) for f in t.frontlines],
+            "current_turn": t.current_turn,
+            "pressure": self._pressure(t.pressure),
+            "credibility": [self._credibility(c) for c in t.credibility],
+            "leader_signals": [self._leader_signal(s) for s in t.leader_signals],
             "actions": action_catalog_to_dict(self._actions),
         }
 
@@ -483,4 +495,84 @@ class SnapshotExporter:
         }
         if f.updated_at is not None:
             out["updated_at"] = f.updated_at.isoformat()
+        return out
+
+    # ---------------------------------------------------------------------
+    # v0.5.0: political layer (pressure, credibility, leader signals)
+    # ---------------------------------------------------------------------
+
+    @classmethod
+    def _pressure(cls, p: PressureState) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "factions": [cls._faction_pressure(fp) for fp in p.factions],
+            "regions": [cls._region_pressure(rp) for rp in p.regions],
+        }
+        if p.global_deadline_turn is not None:
+            out["global_deadline_turn"] = p.global_deadline_turn
+        return out
+
+    @staticmethod
+    def _faction_pressure(fp: FactionPressure) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "faction_id": fp.faction_id,
+            "intensity": fp.intensity,
+            "drivers": list(fp.drivers),
+        }
+        if fp.deadline_turn is not None:
+            out["deadline_turn"] = fp.deadline_turn
+        return out
+
+    @staticmethod
+    def _region_pressure(rp: RegionPressure) -> dict[str, Any]:
+        return {
+            "region_id": rp.region_id,
+            "intensity": rp.intensity,
+            "drivers": list(rp.drivers),
+        }
+
+    @classmethod
+    def _credibility(cls, t: CredibilityTrack) -> dict[str, Any]:
+        return {
+            "from_faction_id": t.from_faction_id,
+            "to_faction_id": t.to_faction_id,
+            "immediate": t.immediate,
+            "resolve": t.resolve,
+            "last_updated_turn": t.last_updated_turn,
+            "history": [cls._gap_event(g) for g in t.history],
+        }
+
+    @staticmethod
+    def _gap_event(g: GapEvent) -> dict[str, Any]:
+        return {
+            "turn": g.turn,
+            "signal_severity": g.signal_severity,
+            "action_severity": g.action_severity,
+            "gap": g.gap,
+            "source": g.source,
+            "note": g.note,
+        }
+
+    @staticmethod
+    def _leader_signal(s: LeaderSignal) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "id": s.id,
+            "timestamp": s.timestamp.isoformat(),
+            "speaker_faction_id": s.speaker_faction_id,
+            "type": s.type.value,
+            "severity": s.severity,
+            "text": s.text,
+            "source": s.source,
+        }
+        if s.target_faction_id is not None:
+            out["target_faction_id"] = s.target_faction_id
+        if s.region_id is not None:
+            out["region_id"] = s.region_id
+        if s.cameo_code is not None:
+            out["cameo_code"] = s.cameo_code
+        if s.goldstein is not None:
+            out["goldstein"] = s.goldstein
+        if s.source_url is not None:
+            out["source_url"] = s.source_url
+        if s.turn is not None:
+            out["turn"] = s.turn
         return out

@@ -10,8 +10,19 @@ export const actionSchema = z.object({
   trend_weight: z.number(),
   severity_weight: z.number(),
   category_sensitivities: z.record(eventCategorySchema, z.number()).default({}),
+  pressure_aggression_bias: z.number().default(0),
+  credibility_weight: z.number().default(0),
 });
 export type Action = z.infer<typeof actionSchema>;
+
+export interface PoliticalContext {
+  issuer_pressure?: number;
+  issuer_deadline_turns_remaining?: number;
+  bilateral_credibility_immediate?: number;
+  bilateral_credibility_resolve?: number;
+  issuer_faction_id?: string;
+  target_faction_id?: string;
+}
 
 export type BreakdownKind = "base" | "modifier" | "category";
 

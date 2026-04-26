@@ -13,6 +13,11 @@ import {
   navalBaseSchema,
   supplyLineSchema,
 } from "./military_assets";
+import {
+  credibilityTrackSchema,
+  leaderSignalSchema,
+  pressureStateSchema,
+} from "./political";
 
 export const allegianceSchema = z.enum(["blue", "red", "neutral"]);
 export type Allegiance = z.infer<typeof allegianceSchema>;
@@ -110,6 +115,10 @@ export const scenarioSnapshotSchema = z.object({
   missile_ranges: z.array(missileRangeSchema).default([]),
   aors: z.array(aorSchema).default([]),
   frontlines: z.array(frontlineSchema).default([]),
+  current_turn: z.number().int().default(0),
+  pressure: pressureStateSchema.default({ factions: [], regions: [] }),
+  credibility: z.array(credibilityTrackSchema).default([]),
+  leader_signals: z.array(leaderSignalSchema).default([]),
   actions: z.array(actionSchema).default([]),
 });
 export type ScenarioSnapshot = z.infer<typeof scenarioSnapshotSchema>;
@@ -149,3 +158,12 @@ export type {
 export type { Frontline } from "./frontline";
 export type { Oblast } from "./oblast";
 export type { Country } from "./country";
+export type {
+  CredibilityTrack,
+  FactionPressure,
+  GapEvent,
+  LeaderSignal,
+  LeaderSignalType,
+  PressureState,
+  RegionPressure,
+} from "./political";

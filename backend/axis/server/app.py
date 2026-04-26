@@ -52,6 +52,11 @@ def create_app(*, store: TheaterStore | None = None) -> FastAPI:
     def state() -> dict[str, Any]:
         return _store().snapshot_dict()
 
+    @app.get("/api/signals")
+    def signals() -> dict[str, Any]:
+        """Political-layer slice: pressure, credibility, leader signals."""
+        return _store().political_dict()
+
     @app.post("/api/orders/execute")
     def execute(payload: dict[str, Any]) -> dict[str, Any]:
         try:

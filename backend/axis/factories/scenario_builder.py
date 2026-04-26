@@ -22,6 +22,14 @@ from axis.domain.military_assets import (
     SupplyLine,
 )
 from axis.domain.oblast import Oblast
+from axis.domain.political import (
+    CredibilityTrack,
+    FactionPressure,
+    LeaderSignal,
+    LeaderSignalType,
+    PressureState,
+    RegionPressure,
+)
 from axis.domain.territory import Territory
 from axis.domain.theater import Theater
 from axis.factories.unit_factory import UnitFactory
@@ -57,6 +65,12 @@ class ScenarioBuilder:
         self._missile_ranges: list[MissileRange] = []
         self._aors: list[AreaOfResponsibility] = []
         self._frontlines: list[Frontline] = []
+        self._current_turn: int = 0
+        self._global_deadline_turn: int | None = None
+        self._faction_pressures: list[FactionPressure] = []
+        self._region_pressures: list[RegionPressure] = []
+        self._credibility: list[CredibilityTrack] = []
+        self._leader_signals: list[LeaderSignal] = []
 
     def with_classification(self, classification: str) -> Self:
         self._classification = classification
@@ -425,9 +439,119 @@ class ScenarioBuilder:
         )
         return self
 
+    # ------------------------------------------------------------------
+    # Political layer (Phase 9)
+    # ------------------------------------------------------------------
+
+    def with_current_turn(self, turn: int) -> Self:
+        if turn < 0:
+            raise ValueError("current_turn must be non-negative")
+        self._current_turn = turn
+        return self
+
+    def with_global_deadline(self, turn: int | None) -> Self:
+        self._global_deadline_turn = turn
+        return self
+
+    def add_faction_pressure(
+        self,
+        *,
+        faction_id: str,
+        intensity: float,
+        deadline_turn: int | None = None,
+        drivers: tuple[str, ...] = (),
+    ) -> Self:
+        self._faction_pressures.append(
+            FactionPressure(
+                faction_id=faction_id,
+                intensity=intensity,
+                deadline_turn=deadline_turn,
+                drivers=drivers,
+            )
+        )
+        return self
+
+    def add_region_pressure(
+        self,
+        *,
+        region_id: str,
+        intensity: float,
+        drivers: tuple[str, ...] = (),
+    ) -> Self:
+        self._region_pressures.append(
+            RegionPressure(
+                region_id=region_id,
+                intensity=intensity,
+                drivers=drivers,
+            )
+        )
+        return self
+
+    def add_credibility(
+        self,
+        *,
+        from_faction_id: str,
+        to_faction_id: str,
+        immediate: float = 0.0,
+        resolve: float = 0.0,
+        last_updated_turn: int = 0,
+    ) -> Self:
+        self._credibility.append(
+            CredibilityTrack(
+                from_faction_id=from_faction_id,
+                to_faction_id=to_faction_id,
+                immediate=immediate,
+                resolve=resolve,
+                last_updated_turn=last_updated_turn,
+            )
+        )
+        return self
+
+    def add_leader_signal(
+        self,
+        *,
+        id: str,
+        timestamp: datetime,
+        speaker_faction_id: str,
+        type: LeaderSignalType | str,
+        severity: float,
+        text: str,
+        target_faction_id: str | None = None,
+        region_id: str | None = None,
+        cameo_code: str | None = None,
+        goldstein: float | None = None,
+        source: str = "stub",
+        source_url: str | None = None,
+        turn: int | None = None,
+    ) -> Self:
+        sig_type = type if isinstance(type, LeaderSignalType) else LeaderSignalType(type)
+        self._leader_signals.append(
+            LeaderSignal(
+                id=id,
+                timestamp=timestamp,
+                speaker_faction_id=speaker_faction_id,
+                type=sig_type,
+                severity=severity,
+                text=text,
+                target_faction_id=target_faction_id,
+                region_id=region_id,
+                cameo_code=cameo_code,
+                goldstein=goldstein,
+                source=source,
+                source_url=source_url,
+                turn=turn,
+            )
+        )
+        return self
+
     def build(self) -> Theater:
         if self._bbox is None:
             raise ValueError("ScenarioBuilder: bbox must be set via with_bbox()")
+        pressure = PressureState(
+            global_deadline_turn=self._global_deadline_turn,
+            factions=tuple(self._faction_pressures),
+            regions=tuple(self._region_pressures),
+        )
         theater = Theater(
             id=self._id,
             name=self._name,
@@ -449,6 +573,10 @@ class ScenarioBuilder:
             missile_ranges=list(self._missile_ranges),
             aors=list(self._aors),
             frontlines=list(self._frontlines),
+            current_turn=self._current_turn,
+            pressure=pressure,
+            credibility=list(self._credibility),
+            leader_signals=list(self._leader_signals),
         )
         theater.validate()
         return theater
