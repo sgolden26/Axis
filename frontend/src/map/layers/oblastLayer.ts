@@ -131,7 +131,7 @@ export const oblastLabelLayer: LayerSpecification = {
   source: SOURCE_OBLASTS,
   layout: {
     "text-field": ["get", "name"],
-    "text-font": ["Open Sans Regular"],
+    "text-font": ["Open Sans Semibold"],
     "text-size": 10,
     "text-letter-spacing": 0.06,
     "text-allow-overlap": false,

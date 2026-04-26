@@ -112,7 +112,7 @@ export const assetLabelLayer: LayerSpecification = {
   minzoom: 4.5,
   layout: {
     "text-field": ["get", "glyph"],
-    "text-font": ["Open Sans Regular"],
+    "text-font": ["Open Sans Semibold"],
     "text-size": [
       "interpolate",
       ["linear"],
