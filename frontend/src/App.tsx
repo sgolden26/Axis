@@ -13,6 +13,7 @@ import { BottomBar } from "@/ui/Bottom/BottomBar";
 import { KeyboardShortcuts } from "@/ui/KeyboardShortcuts";
 import { DecisionImmersive } from "@/ui/DecisionEngine/DecisionImmersive";
 import { MoveLimitToast } from "@/ui/MoveLimitToast";
+import { OrdersCart } from "@/ui/Orders/OrdersCart";
 
 export function App() {
   const setScenario = useAppStore((s) => s.setScenario);
@@ -58,6 +59,7 @@ export function App() {
         <LeftDock />
         <main className="relative flex-1 overflow-hidden">
           <MapView />
+          <OrdersCart />
           <CountryRoster />
           <Minimap />
           <HoverCard />

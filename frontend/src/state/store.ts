@@ -9,6 +9,15 @@ import type { IntelSnapshot, RegionIntel } from "@/types/intel";
 import type { PlayerTeam } from "@/state/playerTeam";
 import type { GroundMoveDraft, GroundMoveMode } from "@/state/groundMove";
 import { isGroundCombatUnit, moveRadiusToastMessage } from "@/state/groundMove";
+import {
+  batchFromStaged,
+  emptyTeamMap,
+  newOrderId,
+  type StagedMoveOrder,
+  type StagedOrder,
+} from "@/state/orders";
+import { executeOrders } from "@/api/executeOrders";
+import { greatCircleInterpolate } from "@/map/geodesic";
 
 export type LayerKey =
   | "oblasts"
@@ -98,6 +107,18 @@ interface AppState {
   /** Ephemeral notice when a click is clamped to the movement ring. */
   moveRadiusToast: string | null;
 
+  /** Per-team shopping cart of staged orders pending Execute. */
+  stagedOrders: Record<PlayerTeam, StagedOrder[]>;
+  cartOpen: boolean;
+  /** True while an OrderBatch is in-flight or being animated. */
+  executing: boolean;
+  /** Per-unit live position overrides used by the animator while orders apply. */
+  unitPositionOverrides: Record<string, [number, number]>;
+  /** Tick that bumps each time overrides change so map effects can re-run cheaply. */
+  unitPositionOverridesEpoch: number;
+  /** Last execute() error (transport-level), surfaced by the cart UI. */
+  orderExecutionError: string | null;
+
   setScenario: (s: ScenarioSnapshot) => void;
   setLoadError: (e: string | null) => void;
   setIntel: (snapshot: IntelSnapshot) => void;
@@ -134,6 +155,13 @@ interface AppState {
   cancelGroundMove: (unitId: string) => void;
   showMoveRadiusToast: (mode: GroundMoveMode) => void;
   dismissMoveRadiusToast: () => void;
+
+  stageMoveFromDraft: (unitId: string) => string | null;
+  removeStagedOrder: (id: string) => void;
+  clearStagedOrders: (team?: PlayerTeam) => void;
+  setCartOpen: (open: boolean) => void;
+  executeStagedOrders: () => Promise<void>;
+  dismissOrderExecutionError: () => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -180,6 +208,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   groundMoveDrafts: {},
   moveRadiusToast: null,
+
+  stagedOrders: emptyTeamMap<StagedOrder[]>(() => []),
+  cartOpen: false,
+  executing: false,
+  unitPositionOverrides: {},
+  unitPositionOverridesEpoch: 0,
+  orderExecutionError: null,
 
   setScenario: (s) =>
     set((state) => ({
@@ -257,11 +292,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearMeasure: () => set({ measurePath: [] }),
   setTickerPaused: (p) => set({ tickerPaused: p }),
   setShowHelp: (on) => set({ showHelp: on }),
-  setPlayerTeam: (t) => set({ playerTeam: t }),
+  setPlayerTeam: (t) =>
+    set((s) => (s.playerTeam === t ? s : { playerTeam: t, groundMoveDrafts: {} })),
   startGroundMove: (unitId, mode) => {
-    const sc = get().scenario;
+    const state0 = get();
+    const sc = state0.scenario;
     const unit = sc?.units.find((u) => u.id === unitId);
     if (!unit || !isGroundCombatUnit(unit.domain)) return;
+    const faction = sc?.factions.find((f) => f.id === unit.faction_id);
+    if (!faction || faction.allegiance !== state0.playerTeam) return;
     set((state) => {
       const prev = state.groundMoveDrafts[unitId];
       const keepDest = prev?.mode === mode ? prev.destination : null;
@@ -308,6 +347,96 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
   showMoveRadiusToast: (mode) => set({ moveRadiusToast: moveRadiusToastMessage(mode) }),
   dismissMoveRadiusToast: () => set({ moveRadiusToast: null }),
+
+  stageMoveFromDraft: (unitId) => {
+    const state = get();
+    const draft = state.groundMoveDrafts[unitId];
+    if (!draft || !draft.destination) return null;
+    const sc = state.scenario;
+    const unit = sc?.units.find((u) => u.id === unitId);
+    if (!unit) return null;
+    const faction = sc?.factions.find((f) => f.id === unit.faction_id);
+    if (!faction || faction.allegiance !== state.playerTeam) return null;
+
+    const id = newOrderId("ord.move");
+    const order: StagedMoveOrder = {
+      id,
+      kind: "move",
+      team: state.playerTeam,
+      unitId,
+      mode: draft.mode,
+      origin: [draft.origin[0], draft.origin[1]],
+      destination: [draft.destination[0], draft.destination[1]],
+    };
+    set((s) => {
+      const teamOrders = s.stagedOrders[s.playerTeam];
+      // Replace any prior staged move for the same unit; one in-flight order per unit.
+      const filtered = teamOrders.filter(
+        (o) => !(o.kind === "move" && o.unitId === unitId),
+      );
+      const nextDrafts = { ...s.groundMoveDrafts };
+      delete nextDrafts[unitId];
+      return {
+        stagedOrders: {
+          ...s.stagedOrders,
+          [s.playerTeam]: [...filtered, order],
+        },
+        groundMoveDrafts: nextDrafts,
+        cartOpen: true,
+      };
+    });
+    return id;
+  },
+  removeStagedOrder: (id) =>
+    set((s) => {
+      const next: Record<PlayerTeam, StagedOrder[]> = {
+        red: s.stagedOrders.red.filter((o) => o.id !== id),
+        blue: s.stagedOrders.blue.filter((o) => o.id !== id),
+      };
+      return { stagedOrders: next };
+    }),
+  clearStagedOrders: (team) =>
+    set((s) => {
+      if (team) {
+        return { stagedOrders: { ...s.stagedOrders, [team]: [] } };
+      }
+      return { stagedOrders: emptyTeamMap<StagedOrder[]>(() => []) };
+    }),
+  setCartOpen: (open) => set({ cartOpen: open }),
+  executeStagedOrders: async () => {
+    const state = get();
+    if (state.executing) return;
+    const team = state.playerTeam;
+    const orders = state.stagedOrders[team];
+    if (orders.length === 0) return;
+
+    set({ executing: true, orderExecutionError: null });
+    try {
+      const result = await executeOrders(batchFromStaged(team, orders));
+      if (!result.ok) {
+        const failed = result.outcomes.filter((o) => !o.ok);
+        const summary =
+          failed.length === 0
+            ? "Some orders were rejected."
+            : failed.map((o) => `· ${o.message}`).join("\n");
+        set({ executing: false, orderExecutionError: summary });
+        return;
+      }
+      await animateMoveOrders(orders, set, get);
+      set((s) => ({
+        scenario: result.snapshot,
+        stagedOrders: { ...s.stagedOrders, [team]: [] },
+        unitPositionOverrides: {},
+        unitPositionOverridesEpoch: s.unitPositionOverridesEpoch + 1,
+        executing: false,
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      set({ executing: false, orderExecutionError: message });
+    }
+  },
+  dismissOrderExecutionError: () => set({ orderExecutionError: null }),
+
   intelByRegion: () => {
     const intel = get().intel;
     const out = new Map<string, RegionIntel>();
@@ -316,3 +445,51 @@ export const useAppStore = create<AppState>((set, get) => ({
     return out;
   },
 }));
+
+const MOVE_ANIMATION_MS = 2500;
+
+/** Tween each move order's unit along the geodesic origin -> destination.
+ *
+ *  Writes a transient `unitPositionOverrides` map that the units layer reads
+ *  before falling back to scenario position. Resolves once the tween ends,
+ *  letting the executor commit the authoritative server snapshot.
+ */
+function animateMoveOrders(
+  orders: StagedOrder[],
+  set: (
+    partial:
+      | Partial<AppState>
+      | ((s: AppState) => Partial<AppState>),
+  ) => void,
+  _get: () => AppState,
+): Promise<void> {
+  const moves = orders.filter((o): o is StagedMoveOrder => o.kind === "move");
+  if (moves.length === 0) return Promise.resolve();
+
+  return new Promise<void>((resolve) => {
+    const start = performance.now();
+    const step = () => {
+      const elapsed = performance.now() - start;
+      const t = Math.min(1, elapsed / MOVE_ANIMATION_MS);
+      const eased = easeInOutCubic(t);
+      const overrides: Record<string, [number, number]> = {};
+      for (const m of moves) {
+        overrides[m.unitId] = greatCircleInterpolate(m.origin, m.destination, eased);
+      }
+      set((s) => ({
+        unitPositionOverrides: overrides,
+        unitPositionOverridesEpoch: s.unitPositionOverridesEpoch + 1,
+      }));
+      if (t < 1) {
+        requestAnimationFrame(step);
+      } else {
+        resolve();
+      }
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}

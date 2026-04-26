@@ -9,9 +9,9 @@ const DOMAIN_LABEL: Record<UnitDomain, string> = {
 };
 
 const DOMAIN_GLYPH: Record<UnitDomain, string> = {
-  ground: "▲",
-  air: "◆",
-  naval: "■",
+  ground: "■",
+  air: "▲",
+  naval: "◆",
 };
 
 export function OOBTree() {

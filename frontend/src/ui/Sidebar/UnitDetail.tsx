@@ -1,6 +1,7 @@
 import type { Faction, Unit } from "@/types/scenario";
 import { useAppStore } from "@/state/store";
 import { isGroundCombatUnit, type GroundMoveMode } from "@/state/groundMove";
+import { isFactionControllableByPlayerTeam } from "@/state/playerTeam";
 import { SectionHeader } from "./primitives/SectionHeader";
 import { KeyValueRow } from "./primitives/KeyValueRow";
 import { MetricBar } from "./primitives/MetricBar";
@@ -27,12 +28,18 @@ const MOVE_ACTIONS: { mode: GroundMoveMode; label: string }[] = [
 export function UnitDetail({ unit, faction }: Props) {
   const groundMoveDrafts = useAppStore((s) => s.groundMoveDrafts);
   const startGroundMove = useAppStore((s) => s.startGroundMove);
-  const confirmGroundMovePicking = useAppStore((s) => s.confirmGroundMovePicking);
   const cancelGroundMove = useAppStore((s) => s.cancelGroundMove);
+  const stageMoveFromDraft = useAppStore((s) => s.stageMoveFromDraft);
+  const playerTeam = useAppStore((s) => s.playerTeam);
+  const stagedOrders = useAppStore((s) => s.stagedOrders);
 
   const draft = groundMoveDrafts[unit.id];
-  const showGroundMoves = isGroundCombatUnit(unit.domain);
+  const playerOwnsUnit = isFactionControllableByPlayerTeam(faction, playerTeam);
+  const showGroundMoves = isGroundCombatUnit(unit.domain) && playerOwnsUnit;
   const actionCount = unit.available_actions.length + (showGroundMoves ? MOVE_ACTIONS.length : 0);
+  const alreadyStaged = stagedOrders[playerTeam].some(
+    (o) => o.kind === "move" && o.unitId === unit.id,
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -116,21 +123,19 @@ export function UnitDetail({ unit, faction }: Props) {
           </div>
           {draft && (
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              {draft.pickingDestination && (
-                <button
-                  type="button"
-                  disabled={!draft.destination}
-                  title={
-                    draft.destination
-                      ? "Finish choosing on the map; you can then select oblasts and other features again."
-                      : "Click the map inside the movement range to set a destination first."
-                  }
-                  onClick={() => confirmGroundMovePicking(unit.id)}
-                  className="hairline border border-accent-ok bg-accent-ok/10 px-2 py-1 font-mono text-[9px] uppercase tracking-wider2 text-accent-ok transition-colors hover:bg-accent-ok/20 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-accent-ok/10"
-                >
-                  Select destination
-                </button>
-              )}
+              <button
+                type="button"
+                disabled={!draft.destination}
+                title={
+                  draft.destination
+                    ? "Add this move to the orders cart; execute from the top-right Orders panel."
+                    : "Click the map inside the movement range to set a destination first."
+                }
+                onClick={() => stageMoveFromDraft(unit.id)}
+                className="hairline border border-accent-ok bg-accent-ok/10 px-2 py-1 font-mono text-[9px] uppercase tracking-wider2 text-accent-ok transition-colors hover:bg-accent-ok/20 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-accent-ok/10"
+              >
+                {alreadyStaged ? "Replace order" : "Add to orders"}
+              </button>
               <button
                 type="button"
                 onClick={() => cancelGroundMove(unit.id)}
@@ -138,6 +143,16 @@ export function UnitDetail({ unit, faction }: Props) {
               >
                 Cancel
               </button>
+            </div>
+          )}
+          {!draft && alreadyStaged && (
+            <div className="mt-2 font-mono text-[9px] uppercase tracking-wider2 text-accent-amber">
+              · order staged · execute from cart
+            </div>
+          )}
+          {!playerOwnsUnit && isGroundCombatUnit(unit.domain) && (
+            <div className="mt-2 font-mono text-[9px] uppercase tracking-wider2 text-ink-200">
+              · controlled by {faction.allegiance} team · switch sides to issue orders
             </div>
           )}
         </div>

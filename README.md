@@ -18,16 +18,32 @@ Axis/
 
 ## Run it
 
-Backend (export a scenario snapshot):
+### One-time: Python env and data export
 
 ```bash
 cd backend
-python -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
 python -m axis export --scenario eastern_europe --out ../data/state.json
 ```
 
-Frontend (dev server on http://localhost:5173):
+`pip install -e .` pulls in the HTTP stack (`fastapi`, `uvicorn`) used by the live theatre service below.
+
+### Interactive orders (live API + Vite)
+
+The app can load state from a running backend and apply staged move orders. Run both processes (two terminals).
+
+**Backend** (FastAPI on http://127.0.0.1:8000, in-memory theatre):
+
+```bash
+cd backend
+source .venv/bin/activate
+python -m axis serve
+```
+
+Useful options: `python -m axis serve --port 8000` (default), `python -m axis serve --host 0.0.0.0` to bind on all interfaces.
+
+**Frontend** (Vite on http://localhost:5173, proxies `/api` to the backend):
 
 ```bash
 cd frontend
@@ -35,7 +51,13 @@ npm install
 npm run dev
 ```
 
-`npm run dev` runs a `predev` step that copies `data/state.json` and `data/intel.json` into `frontend/public/`.
+In dev, the UI prefers `GET /api/state` and `POST /api/orders/execute` via the proxy. If the backend is not running, the app falls back to the static `state.json` (see below).
+
+To reset the in-memory scenario after running orders: `POST http://127.0.0.1:8000/api/reset` (or restart `axis serve`).
+
+### Static only (no backend)
+
+If you only need the map and data, skip `axis serve` and point the app at the exported file. `npm run dev` runs a `predev` step that copies `data/state.json` and `data/intel.json` into `frontend/public/`, and Vite can also read live files from `../data/` in dev. Without the server, order execution is unavailable.
 
 ### Live news (optional)
 

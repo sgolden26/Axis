@@ -99,6 +99,7 @@ export function registerUnitIcons(map: MlMap, factions: Faction[]) {
 export function unitFeatureCollection(
   units: Unit[],
   factionsById: Map<string, Faction>,
+  positionOverrides?: Record<string, [number, number]>,
 ): GeoJSON.FeatureCollection<GeoJSON.Point, UnitProps> {
   const features = units.map<GeoJSON.Feature<GeoJSON.Point, UnitProps>>((u) => ({
     type: "Feature",
@@ -114,7 +115,7 @@ export function unitFeatureCollection(
       glyph: KIND_GLYPH[u.kind],
       domain_rank: DOMAIN_RANK[u.domain],
     },
-    geometry: { type: "Point", coordinates: u.position },
+    geometry: { type: "Point", coordinates: positionOverrides?.[u.id] ?? u.position },
   }));
   return { type: "FeatureCollection", features };
 }

@@ -182,6 +182,7 @@ export function MapView() {
   const measureActive = useAppStore((s) => s.measureActive);
   const pushMeasurePoint = useAppStore((s) => s.pushMeasurePoint);
   const groundMoveDrafts = useAppStore((s) => s.groundMoveDrafts);
+  const positionOverridesEpoch = useAppStore((s) => s.unitPositionOverridesEpoch);
 
   const [borders, setBorders] = useState<BordersBundle | null>(null);
 
@@ -329,6 +330,21 @@ export function MapView() {
     if (map.isStyleLoaded()) run();
     else map.once("load", run);
   }, [groundMoveDrafts, scenario]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !scenario) return;
+    const run = () => {
+      const src = map.getSource(SOURCE_UNITS) as maplibregl.GeoJSONSource | undefined;
+      if (!src) return;
+      const factionsById = new Map(scenario.factions.map((f) => [f.id, f]));
+      const overrides = useAppStore.getState().unitPositionOverrides;
+      const fc = unitFeatureCollection(scenario.units, factionsById, overrides);
+      src.setData(withStringIds(fc));
+    };
+    if (map.isStyleLoaded()) run();
+    else map.once("load", run);
+  }, [positionOverridesEpoch, scenario]);
 
   useEffect(() => {
     const map = mapRef.current;

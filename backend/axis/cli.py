@@ -104,6 +104,32 @@ def list_scenarios() -> None:
         typer.echo(sid)
 
 
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind address."),
+    port: int = typer.Option(8000, "--port", "-p", help="HTTP port."),
+    reload: bool = typer.Option(
+        False,
+        "--reload",
+        help="Enable uvicorn auto-reload (dev only).",
+    ),
+) -> None:
+    """Run the live theatre HTTP service.
+
+    The FE expects this on localhost:8000 and proxies `/api/*` to it during
+    `npm run dev`. Holds the theatre in memory; orders mutate that state.
+    """
+    import uvicorn  # local import keeps `axis export` cheap to start
+
+    uvicorn.run(
+        "axis.server.app:app",
+        host=host,
+        port=port,
+        reload=reload,
+        log_level="info",
+    )
+
+
 @intel_app.command("export")
 def intel_export(
     source: str = typer.Option(

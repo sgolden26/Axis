@@ -1,11 +1,32 @@
 import { scenarioSnapshotSchema, type ScenarioSnapshot } from "@/types/scenario";
 
-export async function loadScenario(url = "/state.json"): Promise<ScenarioSnapshot> {
+const LIVE_URL = "/api/state";
+const STATIC_URL = "/state.json";
+
+/** Prefer the live theatre service; fall back to the static export so the
+ *  demo still loads when `python -m axis serve` is not running. */
+export async function loadScenario(url?: string): Promise<ScenarioSnapshot> {
+  if (url) return parseScenario(await fetchJson(url));
+
+  try {
+    return parseScenario(await fetchJson(LIVE_URL));
+  } catch (err) {
+    console.warn(
+      `[scenario] live API unavailable (${(err as Error).message}); falling back to ${STATIC_URL}`,
+    );
+    return parseScenario(await fetchJson(STATIC_URL));
+  }
+}
+
+async function fetchJson(url: string): Promise<unknown> {
   const res = await fetch(url, { cache: "no-cache" });
   if (!res.ok) {
     throw new Error(`Failed to fetch ${url}: HTTP ${res.status}`);
   }
-  const json = await res.json();
+  return res.json();
+}
+
+function parseScenario(json: unknown): ScenarioSnapshot {
   const parsed = scenarioSnapshotSchema.safeParse(json);
   if (!parsed.success) {
     console.error("[scenario] schema validation failed", parsed.error.issues);
