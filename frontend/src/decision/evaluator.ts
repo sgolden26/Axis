@@ -1,4 +1,9 @@
-import type { Action, BreakdownItem, Outcome } from "@/types/decision";
+import type {
+  Action,
+  BreakdownItem,
+  Outcome,
+  PoliticalContext,
+} from "@/types/decision";
 import type { EventCategory, MoraleTrend, RegionIntel } from "@/types/intel";
 
 export const SEVERITY_DIVISOR = 12.0;
@@ -68,7 +73,11 @@ function buildExplanation(
     : `${action.name}: ${pct}%.`;
 }
 
-export function evaluate(action: Action, region: RegionIntel): Outcome {
+export function evaluate(
+  action: Action,
+  region: RegionIntel,
+  political?: PoliticalContext,
+): Outcome {
   const moraleNorm = (region.morale_score - 50) / 50;
   const pMorale = moraleNorm * action.morale_weight;
 
@@ -94,7 +103,21 @@ export function evaluate(action: Action, region: RegionIntel): Outcome {
   }
 
   const pCategories = categoryItems.reduce((a, b) => a + b.delta, 0);
-  const raw = action.base_rate + pMorale + pTrend + pSeverity + pCategories;
+
+  const { delta: pPressure, label: pressureLabel } = pressureDelta(action, political);
+  const { delta: pCredibility, label: credibilityLabel } = credibilityDelta(
+    action,
+    political,
+  );
+
+  const raw =
+    action.base_rate +
+    pMorale +
+    pTrend +
+    pSeverity +
+    pCategories +
+    pPressure +
+    pCredibility;
   const probability = clamp(raw, P_FLOOR, P_CEIL);
 
   const breakdown: BreakdownItem[] = [
@@ -116,6 +139,16 @@ export function evaluate(action: Action, region: RegionIntel): Outcome {
     });
   }
   breakdown.push(...categoryItems);
+  if (Math.abs(pPressure) >= SIGNIFICANT_DELTA && pressureLabel) {
+    breakdown.push({ label: pressureLabel, kind: "modifier", delta: pPressure });
+  }
+  if (Math.abs(pCredibility) >= SIGNIFICANT_DELTA && credibilityLabel) {
+    breakdown.push({
+      label: credibilityLabel,
+      kind: "modifier",
+      delta: pCredibility,
+    });
+  }
 
   const explanation = buildExplanation(action, region, probability, breakdown);
 
@@ -126,4 +159,38 @@ export function evaluate(action: Action, region: RegionIntel): Outcome {
     breakdown,
     explanation,
   };
+}
+
+function pressureDelta(
+  action: Action,
+  political: PoliticalContext | undefined,
+): { delta: number; label: string | null } {
+  if (!political || political.issuer_pressure == null) return { delta: 0, label: null };
+  const bias = action.pressure_aggression_bias ?? 0;
+  if (bias === 0) return { delta: 0, label: null };
+  const delta = bias * political.issuer_pressure;
+  const label =
+    political.issuer_deadline_turns_remaining != null
+      ? `deadline pressure (T-${political.issuer_deadline_turns_remaining})`
+      : "deadline pressure";
+  return { delta, label };
+}
+
+function credibilityDelta(
+  action: Action,
+  political: PoliticalContext | undefined,
+): { delta: number; label: string | null } {
+  if (!political || political.bilateral_credibility_immediate == null) {
+    return { delta: 0, label: null };
+  }
+  const w = action.credibility_weight ?? 0;
+  if (w === 0) return { delta: 0, label: null };
+  const delta = w * political.bilateral_credibility_immediate;
+  const src = (political.issuer_faction_id ?? "issuer").toUpperCase();
+  const dst = (political.target_faction_id ?? "target").toUpperCase();
+  const band =
+    political.bilateral_credibility_immediate < 0
+      ? "low credibility"
+      : "credibility";
+  return { delta, label: `${band} (${src}→${dst})` };
 }

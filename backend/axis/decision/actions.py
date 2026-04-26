@@ -22,6 +22,17 @@ class Action:
     trend_weight: float  # signed multiplier on trend (-1|0|+1)
     severity_weight: float  # signed multiplier on net recent severity
     category_sensitivities: Mapping[EventCategory, float] = field(default_factory=dict)
+    # Phase 9 political weights:
+    # - aggression_bias: signed bias the action picks up under deadline pressure.
+    #   Aggressive actions (deploy, escalate) take a positive value so high
+    #   issuer pressure boosts their probability; restrained actions (sanctions,
+    #   surveillance) take a negative value so the same pressure suppresses them.
+    # - credibility_weight: signed multiplier on the issuer's outgoing
+    #   `immediate` credibility toward the target faction. Coercive actions take
+    #   a positive value (low credibility hurts them); diplomatic/non-kinetic
+    #   actions take a smaller magnitude.
+    pressure_aggression_bias: float = 0.0
+    credibility_weight: float = 0.0
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -35,6 +46,8 @@ class Action:
             "category_sensitivities": {
                 cat.value: w for cat, w in self.category_sensitivities.items()
             },
+            "pressure_aggression_bias": self.pressure_aggression_bias,
+            "credibility_weight": self.credibility_weight,
         }
 
 
@@ -54,6 +67,8 @@ DEFAULT_ACTIONS: tuple[Action, ...] = (
             EventCategory.POLITICAL_INSTABILITY: -0.10,
             EventCategory.NATIONALIST_SENTIMENT: 0.10,
         },
+        pressure_aggression_bias=0.18,
+        credibility_weight=0.12,
     ),
     Action(
         id="escalate_conflict",
@@ -70,6 +85,8 @@ DEFAULT_ACTIONS: tuple[Action, ...] = (
             EventCategory.POLITICAL_INSTABILITY: -0.05,
             EventCategory.NATIONALIST_SENTIMENT: 0.20,
         },
+        pressure_aggression_bias=0.25,
+        credibility_weight=0.18,
     ),
     Action(
         id="impose_sanctions",
@@ -86,6 +103,8 @@ DEFAULT_ACTIONS: tuple[Action, ...] = (
             EventCategory.POLITICAL_INSTABILITY: 0.15,
             EventCategory.NATIONALIST_SENTIMENT: -0.10,
         },
+        pressure_aggression_bias=-0.10,
+        credibility_weight=0.08,
     ),
     Action(
         id="conduct_surveillance",
@@ -102,6 +121,8 @@ DEFAULT_ACTIONS: tuple[Action, ...] = (
             EventCategory.POLITICAL_INSTABILITY: 0.05,
             EventCategory.NATIONALIST_SENTIMENT: -0.05,
         },
+        pressure_aggression_bias=-0.05,
+        credibility_weight=0.02,
     ),
 )
 

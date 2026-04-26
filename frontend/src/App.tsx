@@ -3,6 +3,7 @@ import { useAppStore } from "@/state/store";
 import { loadScenario } from "@/api/loadScenario";
 import { loadIntel } from "@/api/loadIntel";
 import { HUD } from "@/ui/HUD";
+import { PoliticalStrip } from "@/ui/PoliticalStrip";
 import { LeftDock } from "@/ui/LeftDock/LeftDock";
 import { RightPanel } from "@/ui/RightPanel/RightPanel";
 import { MapView } from "@/map/MapView";
@@ -55,6 +56,7 @@ export function App() {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-ink-900 text-ink-50">
       <HUD />
+      <PoliticalStrip />
       <div className="relative flex flex-1 overflow-hidden">
         <LeftDock />
         <main className="relative flex-1 overflow-hidden">

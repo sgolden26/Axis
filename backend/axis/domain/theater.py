@@ -22,6 +22,7 @@ from axis.domain.military_assets import (
     SupplyLine,
 )
 from axis.domain.oblast import Oblast
+from axis.domain.political import CredibilityTrack, LeaderSignal, PressureState
 from axis.domain.territory import Territory
 
 if TYPE_CHECKING:
@@ -52,6 +53,10 @@ class Theater:
     missile_ranges: list[MissileRange] = field(default_factory=list)
     aors: list[AreaOfResponsibility] = field(default_factory=list)
     frontlines: list[Frontline] = field(default_factory=list)
+    current_turn: int = 0
+    pressure: PressureState = field(default_factory=PressureState)
+    credibility: list[CredibilityTrack] = field(default_factory=list)
+    leader_signals: list[LeaderSignal] = field(default_factory=list)
 
     def faction(self, faction_id: str) -> Faction:
         for f in self.factions:
@@ -71,6 +76,7 @@ class Theater:
         country_ids = {c.id for c in self.countries}
         city_ids = {c.id for c in self.cities}
         unit_ids = {u.id for u in self.units}
+        region_ids = {t.id for t in self.territories} | {o.id for o in self.oblasts}
 
         for country in self.countries:
             if country.faction_id not in faction_ids:
@@ -140,4 +146,40 @@ class Theater:
             if aor.formation_id is not None and aor.formation_id not in unit_ids:
                 raise ValueError(
                     f"AOR {aor.id} formation_id {aor.formation_id} is not a unit"
+                )
+
+        for fp in self.pressure.factions:
+            if fp.faction_id not in faction_ids:
+                raise ValueError(
+                    f"FactionPressure references unknown faction {fp.faction_id}"
+                )
+        for rp in self.pressure.regions:
+            if rp.region_id not in region_ids:
+                raise ValueError(
+                    f"RegionPressure references unknown region {rp.region_id}"
+                )
+        for track in self.credibility:
+            if track.from_faction_id not in faction_ids:
+                raise ValueError(
+                    f"CredibilityTrack from_faction {track.from_faction_id} is unknown"
+                )
+            if track.to_faction_id not in faction_ids:
+                raise ValueError(
+                    f"CredibilityTrack to_faction {track.to_faction_id} is unknown"
+                )
+        for sig in self.leader_signals:
+            if sig.speaker_faction_id not in faction_ids:
+                raise ValueError(
+                    f"LeaderSignal {sig.id} speaker {sig.speaker_faction_id} is unknown"
+                )
+            if (
+                sig.target_faction_id is not None
+                and sig.target_faction_id not in faction_ids
+            ):
+                raise ValueError(
+                    f"LeaderSignal {sig.id} target {sig.target_faction_id} is unknown"
+                )
+            if sig.region_id is not None and sig.region_id not in region_ids:
+                raise ValueError(
+                    f"LeaderSignal {sig.id} region {sig.region_id} is unknown"
                 )

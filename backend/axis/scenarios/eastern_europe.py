@@ -18,6 +18,7 @@ from axis.domain.coordinates import Coordinate
 from axis.domain.countries import StubCountryRepository
 from axis.domain.faction import Allegiance
 from axis.domain.oblast import Oblast
+from axis.domain.political import LeaderSignalType
 from axis.domain.theater import Theater
 from axis.factories.scenario_builder import ScenarioBuilder
 from axis.units.domain import UnitKind
@@ -54,6 +55,7 @@ def build() -> Theater:
     _add_missile_ranges(builder)
     _add_aors(builder)
     _add_frontline(builder)
+    _add_political(builder)
     return builder.build()
 
 
@@ -784,3 +786,163 @@ def _add_frontline(b: ScenarioBuilder) -> None:
     )
     # silence unused import lint
     _ = Coordinate
+
+
+# ---------------------------------------------------------------------------
+# Political layer: pressure, credibility, leader signals (Phase 9)
+# ---------------------------------------------------------------------------
+
+
+def _add_political(b: ScenarioBuilder) -> None:
+    """Seed the political layer.
+
+    Numbers are illustrative scenario assumptions, not predictions. They give
+    the engine and HUD live values to react to. The sim hooks decay/update
+    these values turn-on-turn; the seed is just the starting position.
+    """
+    b.with_current_turn(0)
+    b.with_global_deadline(12)  # 12-turn campaign window
+
+    # Per-faction pressure (derived rollup; sim hook recomputes each turn).
+    b.add_faction_pressure(
+        faction_id="ru",
+        intensity=0.62,
+        deadline_turn=8,
+        drivers=(
+            "mobilisation backlog",
+            "energy revenue volatility",
+            "elite cohesion strain",
+        ),
+    )
+    b.add_faction_pressure(
+        faction_id="ua",
+        intensity=0.74,
+        deadline_turn=6,
+        drivers=(
+            "Western aid window narrowing",
+            "manpower replenishment shortfall",
+            "winter energy infrastructure exposure",
+        ),
+    )
+    b.add_faction_pressure(
+        faction_id="nato",
+        intensity=0.35,
+        deadline_turn=10,
+        drivers=("alliance unity messaging", "domestic election cycles"),
+    )
+
+    # Region-level pressure on the most active sectors.
+    b.add_region_pressure(
+        region_id="terr.donbas-occ",
+        intensity=0.78,
+        drivers=("intense ground combat", "civilian displacement"),
+    )
+    b.add_region_pressure(
+        region_id="terr.crimea-occ",
+        intensity=0.55,
+        drivers=("naval pressure on Sevastopol", "Kerch bridge interdiction risk"),
+    )
+    b.add_region_pressure(
+        region_id="obl.63",  # Kharkiv
+        intensity=0.66,
+        drivers=("border salient activity", "civilian outflow"),
+    )
+    b.add_region_pressure(
+        region_id="obl.23",  # Zaporizhzhia
+        intensity=0.60,
+        drivers=("Robotyne-Tokmak axis", "ZNPP perimeter risk"),
+    )
+    b.add_region_pressure(
+        region_id="obl.65",  # Kherson
+        intensity=0.52,
+        drivers=("east-bank artillery exchanges",),
+    )
+
+    # Bilateral credibility tracks. Two-track per ordered pair across the
+    # primary belligerents and NATO. Initial values reflect baseline trust
+    # given a long-running conflict.
+    tracks: tuple[tuple[str, str, float, float], ...] = (
+        ("ru", "ua", -0.55, -0.40),
+        ("ua", "ru", -0.60, -0.45),
+        ("ru", "nato", -0.50, -0.30),
+        ("nato", "ru", -0.45, -0.25),
+        ("ua", "nato", 0.40, 0.30),
+        ("nato", "ua", 0.50, 0.35),
+    )
+    for src, dst, immediate, resolve in tracks:
+        b.add_credibility(
+            from_faction_id=src,
+            to_faction_id=dst,
+            immediate=immediate,
+            resolve=resolve,
+            last_updated_turn=0,
+        )
+
+    # Stub leader signals. Five recent statements covering ultimatums,
+    # commitments, threats and reassurance. Severity is signed (-1..+1)
+    # aligned to Goldstein/10. The GDELT adapter (see
+    # `intel/leader_statements.py`) emits records of this same shape.
+    base_ts = datetime(2026, 4, 24, 9, 0, tzinfo=timezone.utc)
+    signals = (
+        dict(
+            id="sig.stub.001",
+            speaker_faction_id="ru",
+            type=LeaderSignalType.ULTIMATUM,
+            severity=-0.85,
+            text=(
+                "Demands negotiated halt within 30 days or further "
+                "mobilisation will be authorised."
+            ),
+            target_faction_id="ua",
+            cameo_code="172",
+            goldstein=-8.5,
+        ),
+        dict(
+            id="sig.stub.002",
+            speaker_faction_id="ua",
+            type=LeaderSignalType.COMMITMENT,
+            severity=0.55,
+            text="Public commitment to defend Kharkiv salient at all costs.",
+            target_faction_id=None,
+            region_id="obl.63",
+            cameo_code="057",
+            goldstein=5.5,
+        ),
+        dict(
+            id="sig.stub.003",
+            speaker_faction_id="nato",
+            type=LeaderSignalType.REASSURANCE,
+            severity=0.65,
+            text="Reaffirms multi-year materiel support for Ukraine.",
+            target_faction_id="ua",
+            cameo_code="050",
+            goldstein=6.5,
+        ),
+        dict(
+            id="sig.stub.004",
+            speaker_faction_id="ru",
+            type=LeaderSignalType.THREAT,
+            severity=-0.70,
+            text="Warns of asymmetric response if NATO strike packages cross red line.",
+            target_faction_id="nato",
+            cameo_code="138",
+            goldstein=-7.0,
+        ),
+        dict(
+            id="sig.stub.005",
+            speaker_faction_id="ua",
+            type=LeaderSignalType.DEMAND,
+            severity=-0.30,
+            text="Demands accelerated air defence deliveries from allies.",
+            target_faction_id="nato",
+            cameo_code="112",
+            goldstein=-3.0,
+        ),
+    )
+    for i, s in enumerate(signals):
+        b.add_leader_signal(
+            timestamp=base_ts.replace(hour=9 + i),
+            source="stub",
+            turn=0,
+            **s,
+        )

@@ -75,7 +75,27 @@ def _trend_signed(label: str) -> float:
     return 0.0
 
 
-def evaluate(action: Action, region: RegionIntel) -> Outcome:
+@dataclass(frozen=True, slots=True)
+class PoliticalContext:
+    """Political layer scalars the evaluator factors into probability.
+
+    All fields are optional; absent values are treated as zero so legacy
+    callers and intel-only contexts still work.
+    """
+
+    issuer_pressure: float | None = None  # 0..1 issuer faction pressure
+    issuer_deadline_turns_remaining: int | None = None  # informational only
+    bilateral_credibility_immediate: float | None = None  # -1..+1
+    bilateral_credibility_resolve: float | None = None  # -1..+1
+    issuer_faction_id: str | None = None
+    target_faction_id: str | None = None
+
+
+def evaluate(
+    action: Action,
+    region: RegionIntel,
+    political: PoliticalContext | None = None,
+) -> Outcome:
     morale_norm = (region.morale_score - 50.0) / 50.0
     p_morale = morale_norm * action.morale_weight
 
@@ -107,7 +127,18 @@ def evaluate(action: Action, region: RegionIntel) -> Outcome:
 
     p_categories = sum(item.delta for item in category_items)
 
-    raw = action.base_rate + p_morale + p_trend + p_severity + p_categories
+    p_pressure, pressure_label = _pressure_delta(action, political)
+    p_credibility, credibility_label = _credibility_delta(action, political)
+
+    raw = (
+        action.base_rate
+        + p_morale
+        + p_trend
+        + p_severity
+        + p_categories
+        + p_pressure
+        + p_credibility
+    )
     probability = _clamp(raw, P_FLOOR, P_CEIL)
 
     breakdown: list[BreakdownItem] = [
@@ -131,6 +162,14 @@ def evaluate(action: Action, region: RegionIntel) -> Outcome:
             )
         )
     breakdown.extend(category_items)
+    if abs(p_pressure) >= SIGNIFICANT_DELTA and pressure_label:
+        breakdown.append(
+            BreakdownItem(label=pressure_label, kind="modifier", delta=p_pressure)
+        )
+    if abs(p_credibility) >= SIGNIFICANT_DELTA and credibility_label:
+        breakdown.append(
+            BreakdownItem(label=credibility_label, kind="modifier", delta=p_credibility)
+        )
 
     explanation = _build_explanation(
         action=action,
@@ -146,6 +185,50 @@ def evaluate(action: Action, region: RegionIntel) -> Outcome:
         breakdown=tuple(breakdown),
         explanation=explanation,
     )
+
+
+def _pressure_delta(
+    action: Action, political: PoliticalContext | None
+) -> tuple[float, str | None]:
+    """Aggression bias scaled by issuer pressure.
+
+    Returns `(delta, label)`. Label is None when the contribution is below the
+    significance threshold (the caller still sums delta, the row is dropped).
+    """
+    if political is None or political.issuer_pressure is None:
+        return 0.0, None
+    if action.pressure_aggression_bias == 0.0:
+        return 0.0, None
+    delta = action.pressure_aggression_bias * political.issuer_pressure
+    if political.issuer_deadline_turns_remaining is not None:
+        label = (
+            f"deadline pressure (T-{political.issuer_deadline_turns_remaining})"
+        )
+    else:
+        label = "deadline pressure"
+    return delta, label
+
+
+def _credibility_delta(
+    action: Action, political: PoliticalContext | None
+) -> tuple[float, str | None]:
+    """Coercion-strength multiplier from issuer's outgoing credibility.
+
+    Uses `immediate` (recent signal/action consistency) since coercive
+    affordances depend on near-term reputation. We keep the math simple: delta
+    = credibility_weight * immediate, so positive credibility helps coercive
+    actions and negative credibility hurts them.
+    """
+    if political is None or political.bilateral_credibility_immediate is None:
+        return 0.0, None
+    if action.credibility_weight == 0.0:
+        return 0.0, None
+    delta = action.credibility_weight * political.bilateral_credibility_immediate
+    src = political.issuer_faction_id or "issuer"
+    dst = political.target_faction_id or "target"
+    band = "low credibility" if political.bilateral_credibility_immediate < 0 else "credibility"
+    label = f"{band} ({src.upper()}→{dst.upper()})"
+    return delta, label
 
 
 def _morale_label(morale_norm: float) -> str:

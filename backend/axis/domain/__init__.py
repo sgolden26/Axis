@@ -41,6 +41,15 @@ from axis.domain.military_assets import (
     SupplyLine,
 )
 from axis.domain.oblast import Oblast
+from axis.domain.political import (
+    CredibilityTrack,
+    FactionPressure,
+    GapEvent,
+    LeaderSignal,
+    LeaderSignalType,
+    PressureState,
+    RegionPressure,
+)
 from axis.domain.territory import Territory
 from axis.domain.theater import Theater
 
@@ -59,19 +68,24 @@ __all__ = [
     "Composition",
     "Coordinate",
     "Country",
+    "CredibilityTrack",
     "CrossingMode",
     "Demographics",
     "Depot",
     "Diplomacy",
     "EnergyLogistics",
     "Faction",
+    "FactionPressure",
     "Frontline",
+    "GapEvent",
     "Geography",
     "Government",
     "InventoryLine",
     "InventoryStatus",
     "IsrCoverage",
     "KeyBase",
+    "LeaderSignal",
+    "LeaderSignalType",
     "Military",
     "MilitaryPosture",
     "MissileRange",
@@ -79,7 +93,9 @@ __all__ = [
     "NuclearPosture",
     "NuclearStatus",
     "Oblast",
+    "PressureState",
     "PublicOpinion",
+    "RegionPressure",
     "RegimeType",
     "RelationStatus",
     "ServiceBranch",
