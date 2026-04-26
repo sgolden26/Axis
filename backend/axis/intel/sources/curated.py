@@ -54,6 +54,12 @@ class CuratedSource(IntelSource):
         events: list[Event] = []
         for item in events_raw:
             ts = _resolve_ts(item, anchor_ts, now)
+            url_raw = item.get("url")
+            url = (
+                str(url_raw).strip()
+                if isinstance(url_raw, str) and url_raw.strip()
+                else None
+            )
             events.append(
                 Event(
                     id=str(item["id"]),
@@ -64,6 +70,7 @@ class CuratedSource(IntelSource):
                     snippet=str(item.get("snippet", "")),
                     weight=float(item["weight"]),
                     source="curated",
+                    url=url,
                 )
             )
         return events

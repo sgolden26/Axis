@@ -277,8 +277,13 @@ class GdeltLiveSource(IntelSource):
         if weight == 0.0:
             return None
 
-        url = str(art.get("url") or "")
+        url = str(art.get("url") or "").strip()
         ev_id = _stable_event_id(url or title, seen=str(seen))
+
+        # GDELT URLs are sometimes protocol-relative or otherwise malformed;
+        # the Event ctor will reject anything that isn't http(s)://, so guard
+        # here to keep the article rather than drop it for a bad link.
+        clean_url = url if url.startswith(("http://", "https://")) else None
 
         return Event(
             id=ev_id,
@@ -289,6 +294,7 @@ class GdeltLiveSource(IntelSource):
             snippet=str(art.get("domain") or "")[:120],
             weight=weight,
             source="gdelt",
+            url=clean_url,
         )
 
 

@@ -21,6 +21,7 @@ export const intelEventSchema = z.object({
   snippet: z.string().default(""),
   weight: z.number().min(-1).max(1),
   source: z.string(),
+  url: z.string().url().optional(),
 });
 export type IntelEvent = z.infer<typeof intelEventSchema>;
 

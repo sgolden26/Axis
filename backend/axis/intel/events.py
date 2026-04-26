@@ -49,6 +49,11 @@ class Event:
     snippet: str
     weight: float
     source: str  # curated | gdelt | manual
+    # Optional canonical link back to the article/wire copy this event was
+    # derived from. Populated by the live GDELT source (per-article URL) and
+    # may be set on curated/snapshot events when the author wants the FE to
+    # surface a "view source" affordance.
+    url: str | None = None
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -59,9 +64,19 @@ class Event:
             raise ValueError(f"Event.weight must be in [-1, 1], got {self.weight}")
         if self.ts.tzinfo is None:
             raise ValueError("Event.ts must be timezone-aware")
+        if self.url is not None:
+            u = self.url.strip()
+            if not u:
+                # Treat empty/whitespace as "no url" so callers don't have to
+                # special-case it before constructing the Event.
+                object.__setattr__(self, "url", None)
+            elif not (u.startswith("http://") or u.startswith("https://")):
+                raise ValueError(
+                    f"Event.url must be http(s):// if set, got {self.url!r}"
+                )
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        d: dict[str, object] = {
             "id": self.id,
             "region_id": self.region_id,
             "ts": self.ts.isoformat(),
@@ -71,3 +86,6 @@ class Event:
             "weight": self.weight,
             "source": self.source,
         }
+        if self.url:
+            d["url"] = self.url
+        return d

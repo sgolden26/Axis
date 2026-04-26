@@ -60,6 +60,8 @@ def _event_from_dict(item: dict) -> Event:
     ts = datetime.fromisoformat(str(item["ts"]).replace("Z", "+00:00"))
     if ts.tzinfo is None:
         ts = ts.replace(tzinfo=timezone.utc)
+    url_raw = item.get("url")
+    url = str(url_raw).strip() if isinstance(url_raw, str) and url_raw.strip() else None
     return Event(
         id=str(item["id"]),
         region_id=str(item["region_id"]),
@@ -69,4 +71,5 @@ def _event_from_dict(item: dict) -> Event:
         snippet=str(item.get("snippet", "")),
         weight=float(item["weight"]),
         source="gdelt",
+        url=url,
     )

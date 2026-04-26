@@ -11,6 +11,10 @@ from pathlib import Path
 import typer
 
 from axis import scenarios
+from axis.intel.morale_factors import (
+    build_dataset as build_morale_factors_dataset,
+    write_dataset as write_morale_factors_dataset,
+)
 from axis.intel.pipeline import IntelPipeline, build_source, default_region_ids
 from axis.serialization.snapshot import SnapshotExporter
 from axis.settings import (
@@ -23,8 +27,13 @@ from axis.settings import (
 
 app = typer.Typer(add_completion=False, help="Axis wargame backend CLI.")
 intel_app = typer.Typer(add_completion=False, help="Intel / morale pipeline.")
+morale_factors_app = typer.Typer(
+    add_completion=False,
+    help="Per-region troop-morale factor dataset (one-shot live pull).",
+)
 settings_app = typer.Typer(add_completion=False, help="Backend runtime settings.")
 app.add_typer(intel_app, name="intel")
+intel_app.add_typer(morale_factors_app, name="morale-factors")
 app.add_typer(settings_app, name="settings")
 
 
@@ -208,6 +217,86 @@ def intel_tick(
             time.sleep(interval)
     except KeyboardInterrupt:
         typer.echo("intel tick: stopped.")
+
+
+# ---------- intel morale-factors ----------
+
+
+@morale_factors_app.command("pull")
+def morale_factors_pull(
+    out: Path = typer.Option(
+        Path("../data/morale_factors.json"),
+        "--out",
+        "-o",
+        help="Output morale_factors.json path.",
+    ),
+    lookback_hours: int = typer.Option(
+        72,
+        "--lookback-hours",
+        help="GDELT timespan per call (hours).",
+    ),
+    records_per_batch: int = typer.Option(
+        75,
+        "--records-per-batch",
+        help=(
+            "Articles fetched per (region, keyword-batch). The dataset "
+            "issues 4 regions x 3 batches = 12 calls per pull; articles "
+            "are merged & multi-label classified across all 12 scorable "
+            "factor rows."
+        ),
+    ),
+    timeout_s: float = typer.Option(
+        90.0,
+        "--timeout",
+        help="HTTP timeout per call (seconds). GDELT can be slow under load.",
+    ),
+    inter_call_delay_s: float = typer.Option(
+        2.0,
+        "--inter-call-delay",
+        help=(
+            "Seconds of pause between GDELT calls. Keeps the free-tier "
+            "rate limiter happy; raise if you see 429s."
+        ),
+    ),
+) -> None:
+    """Hit GDELT live in batches and write the morale-factors dataset.
+
+    This command intentionally ignores the `live_news_enabled` setting:
+    it is a one-shot, on-demand pull. The follow-up "refresh on region
+    click" path will gate itself on the toggle separately.
+    """
+    typer.echo(
+        f"morale-factors pull: batched GDELT fetch "
+        f"(lookback={lookback_hours}h, records_per_batch={records_per_batch}, "
+        f"timeout={timeout_s}s, inter_call_delay={inter_call_delay_s}s)..."
+    )
+    dataset = build_morale_factors_dataset(
+        lookback_hours=lookback_hours,
+        records_per_batch=records_per_batch,
+        timeout_s=timeout_s,
+        inter_call_delay_s=inter_call_delay_s,
+    )
+    written = write_morale_factors_dataset(dataset, out)
+    n_regions = len(dataset.regions)
+    n_scored = sum(
+        1
+        for r in dataset.regions
+        for f in r.factors
+        if f.score is not None
+    )
+    n_total = sum(len(r.factors) for r in dataset.regions)
+    n_with_sources = sum(
+        1
+        for r in dataset.regions
+        for f in r.factors
+        if len(f.sources) > 0
+    )
+    n_articles = sum(r.article_count for r in dataset.regions)
+    typer.echo(
+        f"Wrote {written.resolve()} "
+        f"(regions={n_regions}, scored cells={n_scored}/{n_total}, "
+        f"cells with sources={n_with_sources}, total articles={n_articles})"
+    )
 
 
 # ---------- settings ----------

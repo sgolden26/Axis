@@ -1,6 +1,30 @@
-import type { RegionIntel } from "@/types/intel";
+import type { IntelEvent, RegionIntel } from "@/types/intel";
 import type { Faction, Territory } from "@/types/scenario";
 import { Sparkline } from "./Sparkline";
+
+function hostname(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "source";
+  }
+}
+
+function SourceLink({ url }: { url: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={url}
+      onClick={(e) => e.stopPropagation()}
+      className="inline-flex items-center gap-1 border border-ink-400 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider2 text-ink-100 transition-colors hover:border-ink-200 hover:text-ink-50"
+    >
+      <span aria-hidden="true">↗</span>
+      <span className="max-w-[14ch] truncate">{hostname(url)}</span>
+    </a>
+  );
+}
 
 interface Props {
   region: RegionIntel;
@@ -42,6 +66,12 @@ export function RegionSummary({ region, territory, faction }: Props) {
   const score = Math.round(region.morale_score);
   const trendSign = region.trend_delta >= 0 ? "+" : "";
   const now = Date.now();
+  // Drivers only carry an event_id; resolve URLs by looking the event up in
+  // the region's recent_events list so the "source" affordance is consistent
+  // across both panels.
+  const eventsById = new Map<string, IntelEvent>(
+    region.recent_events.map((e) => [e.id, e]),
+  );
 
   return (
     <div className="flex flex-col">
@@ -93,6 +123,7 @@ export function RegionSummary({ region, territory, faction }: Props) {
           <ul className="mt-2 flex flex-col gap-2">
             {region.drivers.map((d) => {
               const isNeg = d.contribution < 0;
+              const driverUrl = eventsById.get(d.event_id)?.url;
               return (
                 <li key={d.event_id} className="flex items-start gap-2">
                   <span
@@ -111,7 +142,10 @@ export function RegionSummary({ region, territory, faction }: Props) {
                         {d.contribution.toFixed(1)}
                       </span>
                     </div>
-                    <div className="text-[12px] text-ink-50">{d.headline}</div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="text-[12px] text-ink-50">{d.headline}</div>
+                      {driverUrl && <SourceLink url={driverUrl} />}
+                    </div>
                   </div>
                 </li>
               );
@@ -134,7 +168,10 @@ export function RegionSummary({ region, territory, faction }: Props) {
                 <span className="text-ink-300">·</span>
                 <span className="text-ink-300">{e.source}</span>
               </div>
-              <div className="text-[12px] text-ink-50">{e.headline}</div>
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-[12px] text-ink-50">{e.headline}</div>
+                {e.url && <SourceLink url={e.url} />}
+              </div>
               {e.snippet && (
                 <div className="mt-0.5 text-[11px] text-ink-200">{e.snippet}</div>
               )}
