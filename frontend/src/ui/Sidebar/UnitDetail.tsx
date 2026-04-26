@@ -1,4 +1,6 @@
 import type { Faction, Unit } from "@/types/scenario";
+import { useAppStore } from "@/state/store";
+import { isGroundCombatUnit, type GroundMoveMode } from "@/state/groundMove";
 import { SectionHeader } from "./primitives/SectionHeader";
 import { KeyValueRow } from "./primitives/KeyValueRow";
 import { MetricBar } from "./primitives/MetricBar";
@@ -17,7 +19,21 @@ const KIND_LABEL: Record<Unit["kind"], string> = {
   naval_task_group: "Naval Task Group",
 };
 
+const MOVE_ACTIONS: { mode: GroundMoveMode; label: string }[] = [
+  { mode: "foot", label: "Move by foot" },
+  { mode: "vehicle", label: "Move via off-road vehicle" },
+];
+
 export function UnitDetail({ unit, faction }: Props) {
+  const groundMoveDrafts = useAppStore((s) => s.groundMoveDrafts);
+  const startGroundMove = useAppStore((s) => s.startGroundMove);
+  const confirmGroundMovePicking = useAppStore((s) => s.confirmGroundMovePicking);
+  const cancelGroundMove = useAppStore((s) => s.cancelGroundMove);
+
+  const draft = groundMoveDrafts[unit.id];
+  const showGroundMoves = isGroundCombatUnit(unit.domain);
+  const actionCount = unit.available_actions.length + (showGroundMoves ? MOVE_ACTIONS.length : 0);
+
   return (
     <div className="flex h-full flex-col">
       <div className="hairline-b px-4 pb-3 pt-4">
@@ -60,26 +76,70 @@ export function UnitDetail({ unit, faction }: Props) {
         value={`${unit.position[1].toFixed(3)}°N  ${unit.position[0].toFixed(3)}°E`}
       />
 
-      <SectionHeader
-        label="available actions"
-        trailing={`${unit.available_actions.length} · stub`}
-      />
-      {unit.available_actions.length === 0 ? (
+      <SectionHeader label="available actions" trailing={`${actionCount}`} />
+      {actionCount === 0 ? (
         <div className="px-4 py-3 font-mono text-[11px] text-ink-200">
           no affordances declared
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-1.5 px-3 py-2">
-          {unit.available_actions.map((a) => (
-            <button
-              key={a}
-              disabled
-              title="stub - execution not implemented"
-              className="hairline border px-2 py-1.5 text-left font-mono text-[10px] uppercase tracking-wider2 text-ink-200 opacity-70"
-            >
-              {a.replace(/_/g, " ")}
-            </button>
-          ))}
+        <div className="px-3 py-2">
+          <div className="grid grid-cols-2 gap-1.5">
+            {showGroundMoves &&
+              MOVE_ACTIONS.map(({ mode, label }) => {
+                const active = draft?.mode === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => startGroundMove(unit.id, mode)}
+                    title={`Plan movement (${mode})`}
+                    className={`hairline border px-2 py-1.5 text-left font-mono text-[10px] uppercase tracking-wider2 transition-colors ${
+                      active
+                        ? "border-faction-nato bg-ink-700 text-ink-50"
+                        : "border-ink-500 bg-ink-800 text-ink-100 hover:border-ink-300 hover:text-ink-50"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            {unit.available_actions.map((a) => (
+              <button
+                key={a}
+                disabled
+                title="stub - execution not implemented"
+                className="hairline border px-2 py-1.5 text-left font-mono text-[10px] uppercase tracking-wider2 text-ink-200 opacity-70"
+              >
+                {a.replace(/_/g, " ")}
+              </button>
+            ))}
+          </div>
+          {draft && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {draft.pickingDestination && (
+                <button
+                  type="button"
+                  disabled={!draft.destination}
+                  title={
+                    draft.destination
+                      ? "Finish choosing on the map; you can then select oblasts and other features again."
+                      : "Click the map inside the movement range to set a destination first."
+                  }
+                  onClick={() => confirmGroundMovePicking(unit.id)}
+                  className="hairline border border-accent-ok bg-accent-ok/10 px-2 py-1 font-mono text-[9px] uppercase tracking-wider2 text-accent-ok transition-colors hover:bg-accent-ok/20 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-accent-ok/10"
+                >
+                  Select destination
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => cancelGroundMove(unit.id)}
+                className="hairline border border-accent-danger bg-accent-danger/10 px-2 py-1 font-mono text-[9px] uppercase tracking-wider2 text-accent-danger transition-colors hover:bg-accent-danger/20"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

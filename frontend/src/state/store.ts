@@ -7,6 +7,8 @@ import type {
 import type { ChoroplethMetric } from "@/types/country";
 import type { IntelSnapshot, RegionIntel } from "@/types/intel";
 import type { PlayerTeam } from "@/state/playerTeam";
+import type { GroundMoveDraft, GroundMoveMode } from "@/state/groundMove";
+import { isGroundCombatUnit, moveRadiusToastMessage } from "@/state/groundMove";
 
 export type LayerKey =
   | "oblasts"
@@ -91,6 +93,11 @@ interface AppState {
   /** Adjudicated side for upcoming move / order affordances. */
   playerTeam: PlayerTeam;
 
+  /** Per-unit ground move planning (map overlay + pending destination until “play”). */
+  groundMoveDrafts: Record<string, GroundMoveDraft>;
+  /** Ephemeral notice when a click is clamped to the movement ring. */
+  moveRadiusToast: string | null;
+
   setScenario: (s: ScenarioSnapshot) => void;
   setLoadError: (e: string | null) => void;
   setIntel: (snapshot: IntelSnapshot) => void;
@@ -120,6 +127,13 @@ interface AppState {
   setShowHelp: (on: boolean) => void;
   setPlayerTeam: (t: PlayerTeam) => void;
   intelByRegion: () => Map<string, RegionIntel>;
+
+  startGroundMove: (unitId: string, mode: GroundMoveMode) => void;
+  setGroundMoveDestination: (unitId: string, dest: [number, number]) => void;
+  confirmGroundMovePicking: (unitId: string) => void;
+  cancelGroundMove: (unitId: string) => void;
+  showMoveRadiusToast: (mode: GroundMoveMode) => void;
+  dismissMoveRadiusToast: () => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -163,6 +177,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   tickerPaused: false,
   showHelp: false,
   playerTeam: "blue",
+
+  groundMoveDrafts: {},
+  moveRadiusToast: null,
 
   setScenario: (s) =>
     set((state) => ({
@@ -241,6 +258,56 @@ export const useAppStore = create<AppState>((set, get) => ({
   setTickerPaused: (p) => set({ tickerPaused: p }),
   setShowHelp: (on) => set({ showHelp: on }),
   setPlayerTeam: (t) => set({ playerTeam: t }),
+  startGroundMove: (unitId, mode) => {
+    const sc = get().scenario;
+    const unit = sc?.units.find((u) => u.id === unitId);
+    if (!unit || !isGroundCombatUnit(unit.domain)) return;
+    set((state) => {
+      const prev = state.groundMoveDrafts[unitId];
+      const keepDest = prev?.mode === mode ? prev.destination : null;
+      return {
+        groundMoveDrafts: {
+          ...state.groundMoveDrafts,
+          [unitId]: {
+            mode,
+            origin: [unit.position[0], unit.position[1]],
+            destination: keepDest,
+            pickingDestination: true,
+          },
+        },
+      };
+    });
+  },
+  setGroundMoveDestination: (unitId, dest) =>
+    set((state) => {
+      const d = state.groundMoveDrafts[unitId];
+      if (!d || !d.pickingDestination) return state;
+      return {
+        groundMoveDrafts: {
+          ...state.groundMoveDrafts,
+          [unitId]: { ...d, destination: dest },
+        },
+      };
+    }),
+  confirmGroundMovePicking: (unitId) =>
+    set((state) => {
+      const d = state.groundMoveDrafts[unitId];
+      if (!d) return state;
+      return {
+        groundMoveDrafts: {
+          ...state.groundMoveDrafts,
+          [unitId]: { ...d, pickingDestination: false },
+        },
+      };
+    }),
+  cancelGroundMove: (unitId) =>
+    set((state) => {
+      const next = { ...state.groundMoveDrafts };
+      delete next[unitId];
+      return { groundMoveDrafts: next };
+    }),
+  showMoveRadiusToast: (mode) => set({ moveRadiusToast: moveRadiusToastMessage(mode) }),
+  dismissMoveRadiusToast: () => set({ moveRadiusToast: null }),
   intelByRegion: () => {
     const intel = get().intel;
     const out = new Map<string, RegionIntel>();

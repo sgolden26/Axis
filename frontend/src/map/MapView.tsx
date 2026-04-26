@@ -82,6 +82,17 @@ import {
   LAYER_SUPPLY_LINE,
   SOURCE_SUPPLY,
 } from "./layers/supplyLayer";
+import {
+  ensureMovementOverlay,
+  refreshMovementOverlayData,
+  SOURCE_MOVEMENT,
+  LAYER_MOVEMENT_FILL,
+  LAYER_MOVEMENT_RING,
+  LAYER_MOVEMENT_ROUTE,
+  LAYER_MOVEMENT_DEST,
+} from "./layers/movementOverlay";
+import { clampToGeodesicDisk, haversineKm } from "./geodesic";
+import { groundMoveRadiusKm } from "@/state/groundMove";
 
 // Ordered top-most first. queryRenderedFeatures returns features in render order
 // (top -> bottom); we keep this list aligned with the layer paint order in
@@ -103,6 +114,9 @@ const CLICKABLE_LAYERS = [
 
 type HoverState = { source: string; id: string | number } | null;
 
+/** Clicks within this distance of the draft origin exit move planning. */
+const MOVE_ORIGIN_EXIT_KM = 0.2;
+
 const SOURCE_TO_KIND: Record<string, SelectableKind> = {
   [SOURCE_UNITS]: "unit",
   [SOURCE_CITIES]: "city",
@@ -119,6 +133,31 @@ const ASSET_KIND_TO_SELECTABLE: Record<string, SelectableKind> = {
   naval_base: "naval_base",
   border_crossing: "border_crossing",
 };
+
+function topClickableFeature(
+  map: MlMap,
+  point: maplibregl.PointLike,
+): MapGeoJSONFeature | null {
+  const layers = CLICKABLE_LAYERS.filter((l) => map.getLayer(l));
+  const features = map.queryRenderedFeatures(point, { layers });
+  return features[0] ?? null;
+}
+
+function resolveSelectableFromFeature(
+  feat: MapGeoJSONFeature,
+): { kind: SelectableKind; id: string } | null {
+  const id = feat.properties?.id as string | undefined;
+  if (!id) return null;
+  let kind: SelectableKind | undefined;
+  if (feat.source === SOURCE_ASSETS) {
+    const assetKind = String(feat.properties?.kind ?? "");
+    kind = ASSET_KIND_TO_SELECTABLE[assetKind];
+  } else {
+    kind = SOURCE_TO_KIND[feat.source];
+  }
+  if (!kind) return null;
+  return { kind, id };
+}
 
 /**
  * Initial theatre framing. Reused as the "selection-fly" floor for any feature
@@ -142,6 +181,7 @@ export function MapView() {
   const setHover = useAppStore((s) => s.setHover);
   const measureActive = useAppStore((s) => s.measureActive);
   const pushMeasurePoint = useAppStore((s) => s.pushMeasurePoint);
+  const groundMoveDrafts = useAppStore((s) => s.groundMoveDrafts);
 
   const [borders, setBorders] = useState<BordersBundle | null>(null);
 
@@ -189,52 +229,50 @@ export function MapView() {
     const map = mapRef.current;
     if (!map || !scenario) return;
 
-    const activeLayers = () => CLICKABLE_LAYERS.filter((l) => map.getLayer(l));
-
-    const resolveFeature = (
-      feat: MapGeoJSONFeature,
-    ): { kind: SelectableKind; id: string } | null => {
-      const id = feat.properties?.id as string | undefined;
-      if (!id) return null;
-      let kind: SelectableKind | undefined;
-      if (feat.source === SOURCE_ASSETS) {
-        const assetKind = String(feat.properties?.kind ?? "");
-        kind = ASSET_KIND_TO_SELECTABLE[assetKind];
-      } else {
-        kind = SOURCE_TO_KIND[feat.source];
-      }
-      if (!kind) return null;
-      return { kind, id };
-    };
-
-    // queryRenderedFeatures returns features in render order (top-most first),
-    // so a unit drawn over a country fill wins over the country.
-    const topFeature = (point: maplibregl.PointLike): MapGeoJSONFeature | null => {
-      const features = map.queryRenderedFeatures(point, { layers: activeLayers() });
-      return features[0] ?? null;
-    };
-
     const onClick = (ev: maplibregl.MapMouseEvent) => {
       if (useAppStore.getState().measureActive) {
         pushMeasurePoint({ lon: ev.lngLat.lng, lat: ev.lngLat.lat });
         return;
       }
-      const feat = topFeature(ev.point);
-      if (!feat) {
-        useAppStore.getState().clearSelection();
+
+      const st = useAppStore.getState();
+      const sel = st.selection;
+      const drafts = st.groundMoveDrafts;
+      const topFeat = topClickableFeature(map, ev.point);
+
+      if (sel?.kind === "unit" && drafts[sel.id]?.pickingDestination) {
+        applyGroundMoveClick(sel.id, [ev.lngLat.lng, ev.lngLat.lat]);
         return;
       }
-      const resolved = resolveFeature(feat);
+
+      if (!topFeat) {
+        st.clearSelection();
+        return;
+      }
+      const resolved = resolveSelectableFromFeature(topFeat);
       if (!resolved) {
-        useAppStore.getState().clearSelection();
+        st.clearSelection();
         return;
       }
       select(resolved);
     };
 
     const onMouseMove = (ev: maplibregl.MapMouseEvent) => {
-      if (useAppStore.getState().measureActive) return;
-      const feat = topFeature(ev.point);
+      const stMove = useAppStore.getState();
+      if (stMove.measureActive) return;
+      if (
+        stMove.selection?.kind === "unit" &&
+        stMove.groundMoveDrafts[stMove.selection.id]?.pickingDestination
+      ) {
+        if (hoverRef.current) {
+          map.setFeatureState(hoverRef.current, { hover: false });
+          hoverRef.current = null;
+        }
+        map.getCanvas().style.cursor = "crosshair";
+        setHover(null);
+        return;
+      }
+      const feat = topClickableFeature(map, ev.point);
       if (!feat || feat.id == null) {
         if (hoverRef.current) {
           map.setFeatureState(hoverRef.current, { hover: false });
@@ -255,7 +293,7 @@ export function MapView() {
       map.setFeatureState(next, { hover: true });
       hoverRef.current = next;
 
-      const resolved = resolveFeature(feat);
+      const resolved = resolveSelectableFromFeature(feat);
       if (resolved) {
         setHover({ ...resolved, x: ev.point.x, y: ev.point.y });
       }
@@ -280,6 +318,17 @@ export function MapView() {
       map.off("mouseout", onMouseOut);
     };
   }, [scenario, select, setHover, pushMeasurePoint]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !scenario) return;
+    const run = () => {
+      if (!map.getSource(SOURCE_MOVEMENT)) return;
+      refreshMovementOverlayData(map, groundMoveDrafts, scenario.units);
+    };
+    if (map.isStyleLoaded()) run();
+    else map.once("load", run);
+  }, [groundMoveDrafts, scenario]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -329,8 +378,12 @@ export function MapView() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.getCanvas().style.cursor = measureActive ? "crosshair" : "";
-  }, [measureActive]);
+    const st = useAppStore.getState();
+    const picking =
+      st.selection?.kind === "unit" &&
+      st.groundMoveDrafts[st.selection.id]?.pickingDestination;
+    map.getCanvas().style.cursor = measureActive || picking ? "crosshair" : "";
+  }, [measureActive, selection, groundMoveDrafts]);
 
   return <div ref={containerRef} className="absolute inset-0" />;
 }
@@ -614,6 +667,9 @@ function addOrUpdateData(
   addLayerOnce(map, unitHaloLayer);
   addLayerOnce(map, unitDotLayer);
   addLayerOnce(map, unitGlyphLayer);
+
+  ensureMovementOverlay(map);
+  refreshMovementOverlayData(map, useAppStore.getState().groundMoveDrafts, scenario.units);
 }
 
 function addLayerOnce(map: MlMap, spec: maplibregl.LayerSpecification) {
@@ -647,6 +703,22 @@ function withStringIds<G extends GeoJSON.Geometry, P extends { id: string }>(
   };
 }
 
+function applyGroundMoveClick(unitId: string, click: [number, number]): void {
+  const st = useAppStore.getState();
+  const draft = st.groundMoveDrafts[unitId];
+  if (!draft || !draft.pickingDestination) return;
+
+  if (haversineKm(draft.origin, click) < MOVE_ORIGIN_EXIT_KM) {
+    st.cancelGroundMove(unitId);
+    return;
+  }
+
+  const maxKm = groundMoveRadiusKm(draft.mode);
+  const { point: dest, clamped } = clampToGeodesicDisk(draft.origin, click, maxKm);
+  if (clamped) st.showMoveRadiusToast(draft.mode);
+  st.setGroundMoveDestination(unitId, dest);
+}
+
 function applyLayerVisibility(map: MlMap, vis: Record<LayerKey, boolean>) {
   const set = (layerId: string, visible: boolean) => {
     if (!map.getLayer(layerId)) return;
@@ -666,6 +738,10 @@ function applyLayerVisibility(map: MlMap, vis: Record<LayerKey, boolean>) {
   set(LAYER_FRONTLINE_LINE, vis.frontline);
   set(LAYER_SUPPLY_LINE, vis.supply_lines);
   set(LAYER_SUPPLY_DASH, vis.supply_lines);
+  set(LAYER_MOVEMENT_FILL, vis.units_ground);
+  set(LAYER_MOVEMENT_RING, vis.units_ground);
+  set(LAYER_MOVEMENT_ROUTE, vis.units_ground);
+  set(LAYER_MOVEMENT_DEST, vis.units_ground);
 
   // Asset visibility is per-kind, driven by individual toggles.
   const assetKindVisible = (kind: string): boolean => {

@@ -12,6 +12,7 @@ import { Minimap } from "@/ui/Bottom/Minimap";
 import { BottomBar } from "@/ui/Bottom/BottomBar";
 import { KeyboardShortcuts } from "@/ui/KeyboardShortcuts";
 import { DecisionImmersive } from "@/ui/DecisionEngine/DecisionImmersive";
+import { MoveLimitToast } from "@/ui/MoveLimitToast";
 
 export function App() {
   const setScenario = useAppStore((s) => s.setScenario);
@@ -61,6 +62,7 @@ export function App() {
           <Minimap />
           <HoverCard />
           <KeyboardShortcuts />
+          <MoveLimitToast />
           {!scenario && !loadError && <LoadingOverlay />}
           {loadError && <ErrorOverlay message={loadError} />}
         </main>
