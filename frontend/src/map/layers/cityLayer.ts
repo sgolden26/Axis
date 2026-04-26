@@ -69,13 +69,17 @@ export const cityHaloLayer: LayerSpecification = {
  * Dark plate that gives every city icon a consistent legibility floor against
  * the satellite basemap, with a faction-coloured rim that brightens on hover.
  * The plate also serves as the click target now that the bare dot is retired.
+ *
+ * Importance hierarchy is conveyed through plate radius (capital > major >
+ * minor) using `match` at the outer level so the inner zoom interpolation
+ * is a clean numeric expression that maplibre accepts.
  */
 export const cityPlateLayer: LayerSpecification = {
   id: LAYER_CITY_PLATE,
   type: "circle",
   source: SOURCE_CITIES,
   paint: {
-    "circle-color": "rgba(11,15,20,0.85)",
+    "circle-color": "rgba(11,15,20,0.88)",
     "circle-stroke-color": ["get", "color"],
     "circle-stroke-width": [
       "case",
@@ -84,14 +88,12 @@ export const cityPlateLayer: LayerSpecification = {
       1.1,
     ],
     "circle-radius": [
-      "interpolate",
-      ["linear"],
-      ["zoom"],
-      3, ["match", ["get", "importance"], "capital", 7, "major", 6, 5],
-      6, ["match", ["get", "importance"], "capital", 11, "major", 9, 7.5],
-      9, ["match", ["get", "importance"], "capital", 15, "major", 12.5, 10],
+      "interpolate", ["linear"], ["zoom"],
+      3, ["match", ["get", "importance"], "capital", 9, "major", 7, 6],
+      6, ["match", ["get", "importance"], "capital", 13, "major", 11, 9],
+      9, ["match", ["get", "importance"], "capital", 17, "major", 14, 12],
     ],
-    "circle-opacity": 0.92,
+    "circle-opacity": 0.95,
   },
 };
 
@@ -121,21 +123,19 @@ export const cityIconLayer: LayerSpecification = {
   layout: {
     "icon-image": CITY_ICON,
     "icon-size": [
-      "interpolate",
-      ["linear"],
-      ["zoom"],
-      3, ["match", ["get", "importance"], "capital", 0.42, "major", 0.36, 0.30],
-      6, ["match", ["get", "importance"], "capital", 0.62, "major", 0.52, 0.42],
-      9, ["match", ["get", "importance"], "capital", 0.85, "major", 0.7, 0.55],
+      "interpolate", ["linear"], ["zoom"],
+      3, ["match", ["get", "importance"], "capital", 0.55, "major", 0.45, 0.38],
+      6, ["match", ["get", "importance"], "capital", 0.78, "major", 0.65, 0.55],
+      9, ["match", ["get", "importance"], "capital", 1.0, "major", 0.85, 0.72],
     ],
     "icon-allow-overlap": true,
     "icon-ignore-placement": true,
   },
   paint: {
     "icon-color": ["get", "color"],
-    "icon-halo-color": "#070a0e",
-    "icon-halo-width": 0.8,
-    "icon-opacity": 0.98,
+    "icon-halo-color": "rgba(7,10,14,0.9)",
+    "icon-halo-width": 1.2,
+    "icon-opacity": 1,
   },
 };
 
@@ -147,10 +147,8 @@ export const cityLabelLayer: LayerSpecification = {
     "text-field": ["get", "name"],
     "text-font": ["Open Sans Semibold"],
     "text-size": [
-      "interpolate",
-      ["linear"],
-      ["zoom"],
-      4, ["match", ["get", "importance"], "capital", 11, "major", 10, 0],
+      "interpolate", ["linear"], ["zoom"],
+      4, ["match", ["get", "importance"], "capital", 11, "major", 10, 9],
       6, ["match", ["get", "importance"], "capital", 12, "major", 11, 10],
       9, ["match", ["get", "importance"], "capital", 13, "major", 12, 11],
     ],

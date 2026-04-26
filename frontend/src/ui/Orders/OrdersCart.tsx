@@ -221,6 +221,7 @@ interface OrderRowProps {
 function OrderRow({ order, unitsById, factionsById, onSelect, onRemove, disabled }: OrderRowProps) {
   const accent = factionAccent(order, unitsById, factionsById);
   const { title, subtitle } = orderRowSummary(order);
+  const isLlm = order.source === "llm";
   return (
     <li className="hairline-b last:border-b-0 flex items-start gap-2 px-3 py-2">
       <button
@@ -234,6 +235,14 @@ function OrderRow({ order, unitsById, factionsById, onSelect, onRemove, disabled
             className="inline-block h-2 w-2 shrink-0"
             style={{ backgroundColor: accent }}
           />
+          {isLlm && (
+            <span
+              className="hairline border border-accent-ok bg-accent-ok/10 px-1 py-px font-mono text-[8px] uppercase tracking-wider2 text-accent-ok"
+              title="Suggested by the assistant"
+            >
+              AI
+            </span>
+          )}
           <span className="text-[12px] font-semibold text-ink-50 truncate">{title}</span>
         </div>
         <div className="mt-0.5 flex items-baseline gap-2 font-mono text-[9px] uppercase tracking-wider2 text-ink-200">

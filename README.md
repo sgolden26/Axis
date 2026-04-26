@@ -43,6 +43,17 @@ python -m axis serve
 
 Useful options: `python -m axis serve --port 8000` (default), `python -m axis serve --host 0.0.0.0` to bind on all interfaces.
 
+To enable the in-app AssistantBar (LLM-driven order suggester), export an
+OpenAI API key in the same shell before `axis serve`:
+
+```bash
+export OPENAI_API_KEY=sk-...
+python -m axis serve
+```
+
+Without the key, `POST /api/orders/suggest` returns 503 with a clear
+message and the rest of the app continues to work normally.
+
 **Frontend** (Vite on http://localhost:5173, proxies `/api` to the backend):
 
 ```bash

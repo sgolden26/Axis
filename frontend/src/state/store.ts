@@ -26,6 +26,8 @@ import {
   type StagedRebaseAirOrder,
   type StagedResupplyOrder,
 } from "@/state/orders";
+import type { OrderDTO } from "@/types/orders";
+import { suggestOrders } from "@/api/suggestOrders";
 import type {
   SortieMissionDTO,
   StrikeTargetKindDTO,
@@ -36,8 +38,12 @@ import {
   type ActionDraftCandidate,
   type DraftSpec,
 } from "@/state/actionDraft";
-import { executeOrders } from "@/api/executeOrders";
 import { executeRound } from "@/api/executeRound";
+import {
+  buildReplayEvents,
+  type ReplayEvent,
+  type ReplayPhase,
+} from "@/state/replay";
 import { greatCircleInterpolate, haversineKm } from "@/map/geodesic";
 
 export type LayerKey =
@@ -160,6 +166,20 @@ interface AppState {
     political_summary: Record<string, Record<string, number>>;
   } | null;
 
+  /** Active phased replay of the most recent round, or null when idle.
+   *  `phase` walks moves -> strikes -> reports; reports persists until
+   *  the user clicks "Dismiss". */
+  replay: { phase: ReplayPhase; events: ReplayEvent[] } | null;
+
+  /** AssistantBar state: prompt-bar busy flag + last LLM result + last error.
+   *  `assistantRationale` is the prose returned by the LLM and lives until
+   *  dismissed or the next successful submit. */
+  assistantBusy: boolean;
+  assistantRationale: string | null;
+  assistantWarnings: string[];
+  assistantError: string | null;
+  assistantStagedCount: number;
+
   setScenario: (s: ScenarioSnapshot) => void;
   setLoadError: (e: string | null) => void;
   setIntel: (snapshot: IntelSnapshot) => void;
@@ -241,10 +261,19 @@ interface AppState {
   setCartOpen: (open: boolean) => void;
   /** Toggle a team's Ready lock. Locked teams cannot stage/remove orders. */
   setRoundReady: (team: PlayerTeam, ready: boolean) => void;
-  executeStagedOrders: () => Promise<void>;
   /** Hot-seat round execute: requires both teams to be Ready. */
   executeRound: () => Promise<void>;
+  /** Skip the current replay phase early. Auto-advances if not in `reports`. */
+  skipReplayPhase: () => void;
+  /** Dismiss the persistent damage chips and end the replay. */
+  dismissReplay: () => void;
   dismissOrderExecutionError: () => void;
+
+  /** AssistantBar: send a free-form prompt to the LLM and stage any returned
+   *  orders (tagged `source: "llm"`). No-op while `roundReady[playerTeam]`. */
+  submitAssistantPrompt: (prompt: string) => Promise<void>;
+  /** Drop the in-place rationale strip and clear assistant warnings/errors. */
+  dismissAssistant: () => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -304,6 +333,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   unitPositionOverridesEpoch: 0,
   orderExecutionError: null,
   lastExecutionResult: null,
+  replay: null,
+
+  assistantBusy: false,
+  assistantRationale: null,
+  assistantWarnings: [],
+  assistantError: null,
+  assistantStagedCount: 0,
 
   setScenario: (s) =>
     set((state) => ({
@@ -748,6 +784,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const state = get();
     if (state.executing) return;
     if (!state.roundReady.red || !state.roundReady.blue) return;
+    const scenarioBefore = state.scenario;
+    if (!scenarioBefore) return;
 
     const batches = (["blue", "red"] as PlayerTeam[]).map((team) =>
       batchFromStaged(team, state.stagedOrders[team]),
@@ -771,11 +809,25 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ executing: false, orderExecutionError: summary });
         return;
       }
-      await animateMoveOrders(allOrders, set, get);
+
+      const events = buildReplayEvents(
+        scenarioBefore, allOrders, result.outcomes_by_team,
+      );
       const flatOutcomes = [
         ...(result.outcomes_by_team.blue ?? []),
         ...(result.outcomes_by_team.red ?? []),
       ];
+
+      // Phase 1: moves. Tween position overrides; existing animator.
+      set({ replay: { phase: "moves", events } });
+      await animateMoveOrders(allOrders, set, get);
+
+      // Phase 2: strikes (arcs + impact pulses are driven off `replay.phase`).
+      set({ replay: { phase: "strikes", events } });
+      await waitPhase(STRIKE_PHASE_MS);
+
+      // Phase 3: reports. Persistent damage chips. Commit snapshot now so the
+      // map reflects the post-round world; chips remain until user dismisses.
       set((s) => ({
         scenario: result.snapshot,
         stagedOrders: emptyTeamMap<StagedOrder[]>(() => []),
@@ -783,6 +835,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         unitPositionOverrides: {},
         unitPositionOverridesEpoch: s.unitPositionOverridesEpoch + 1,
         executing: false,
+        replay: { phase: "reports", events },
         lastExecutionResult: {
           at: Date.now(),
           outcomes: flatOutcomes,
@@ -791,47 +844,59 @@ export const useAppStore = create<AppState>((set, get) => ({
       }));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      set({ executing: false, orderExecutionError: message });
+      set({ executing: false, orderExecutionError: message, replay: null });
+      cancelPendingPhase();
     }
   },
-  executeStagedOrders: async () => {
-    const state = get();
-    if (state.executing) return;
-    const team = state.playerTeam;
-    const orders = state.stagedOrders[team];
-    if (orders.length === 0) return;
+  skipReplayPhase: () => {
+    const r = get().replay;
+    if (!r || r.phase === "reports") return;
+    cancelPendingPhase();
+  },
+  dismissReplay: () => set({ replay: null }),
+  dismissOrderExecutionError: () => set({ orderExecutionError: null }),
 
-    set({ executing: true, orderExecutionError: null });
+  submitAssistantPrompt: async (prompt) => {
+    const text = prompt.trim();
+    if (!text) return;
+    const state = get();
+    if (state.assistantBusy) return;
+    if (!state.scenario) return;
+    if (state.roundReady[state.playerTeam]) {
+      set({ assistantError: "Team is ready. Unready to plan more orders." });
+      return;
+    }
+    set({
+      assistantBusy: true,
+      assistantError: null,
+      assistantWarnings: [],
+      assistantRationale: null,
+      assistantStagedCount: 0,
+    });
     try {
-      const result = await executeOrders(batchFromStaged(team, orders));
-      if (!result.ok) {
-        const failed = result.outcomes.filter((o) => !o.ok);
-        const summary =
-          failed.length === 0
-            ? "Some orders were rejected."
-            : failed.map((o) => `· ${o.message}`).join("\n");
-        set({ executing: false, orderExecutionError: summary });
-        return;
-      }
-      await animateMoveOrders(orders, set, get);
-      set((s) => ({
-        scenario: result.snapshot,
-        stagedOrders: { ...s.stagedOrders, [team]: [] },
-        unitPositionOverrides: {},
-        unitPositionOverridesEpoch: s.unitPositionOverridesEpoch + 1,
-        executing: false,
-        lastExecutionResult: {
-          at: Date.now(),
-          outcomes: result.outcomes,
-          political_summary: result.political_summary,
-        },
-      }));
+      const team = state.playerTeam;
+      const res = await suggestOrders({ prompt: text, issuer_team: team });
+      const { staged, rejected } = applyLlmSuggestionsToCart(res.orders, team, set, get);
+      const warnings = [...res.warnings, ...rejected];
+      set({
+        assistantBusy: false,
+        assistantRationale: res.rationale || null,
+        assistantWarnings: warnings,
+        assistantStagedCount: staged,
+        cartOpen: staged > 0,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      set({ executing: false, orderExecutionError: message });
+      set({ assistantBusy: false, assistantError: message });
     }
   },
-  dismissOrderExecutionError: () => set({ orderExecutionError: null }),
+  dismissAssistant: () =>
+    set({
+      assistantRationale: null,
+      assistantWarnings: [],
+      assistantError: null,
+      assistantStagedCount: 0,
+    }),
 
   intelByRegion: () => {
     const intel = get().intel;
@@ -842,7 +907,38 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 }));
 
-const MOVE_ANIMATION_MS = 2500;
+const MOVE_ANIMATION_MS = 2200;
+const STRIKE_PHASE_MS = 1800;
+
+/** Phase-wait plumbing. Each `waitPhase(ms)` resolves either after `ms` or
+ *  when `cancelPendingPhase` is called (Skip button). The move animator also
+ *  cooperates with the same flag to short-circuit its rAF loop. */
+let _phaseResolver: (() => void) | null = null;
+let _phaseTimer: ReturnType<typeof setTimeout> | null = null;
+let _phaseSkipped = false;
+function waitPhase(ms: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    _phaseSkipped = false;
+    _phaseResolver = resolve;
+    _phaseTimer = setTimeout(() => {
+      _phaseTimer = null;
+      const r = _phaseResolver;
+      _phaseResolver = null;
+      r?.();
+    }, ms);
+  });
+}
+function cancelPendingPhase(): void {
+  _phaseSkipped = true;
+  if (_phaseTimer !== null) {
+    clearTimeout(_phaseTimer);
+    _phaseTimer = null;
+  }
+  const r = _phaseResolver;
+  _phaseResolver = null;
+  r?.();
+}
+function isPhaseSkipped(): boolean { return _phaseSkipped; }
 
 /** Tween each position-changing order along its geodesic origin -> destination.
  *
@@ -870,10 +966,11 @@ function animateMoveOrders(
   if (tweens.length === 0) return Promise.resolve();
 
   return new Promise<void>((resolve) => {
+    _phaseSkipped = false;
     const start = performance.now();
     const step = () => {
       const elapsed = performance.now() - start;
-      const t = Math.min(1, elapsed / MOVE_ANIMATION_MS);
+      const t = isPhaseSkipped() ? 1 : Math.min(1, elapsed / MOVE_ANIMATION_MS);
       const eased = easeInOutCubic(t);
       const overrides: Record<string, [number, number]> = {};
       for (const m of tweens) {
@@ -1030,4 +1127,235 @@ function candidateKindToStrike(
   k: ActionDraftCandidate["candidateKind"],
 ): StrikeTargetKindDTO {
   return k as StrikeTargetKindDTO;
+}
+
+// ---------------------------------------------------------------------------
+// LLM suggestion staging
+// ---------------------------------------------------------------------------
+
+/** Walk an LLM-returned `OrderDTO[]`, build matching `StagedOrder`s tagged
+ *  `source: "llm"`, and append them to the active team's cart.
+ *
+ *  Mirrors the per-kind ownership / shape checks used by the manual stage*
+ *  helpers but writes the team list in one pass to avoid N intermediate
+ *  re-renders. Returns counts so the assistant strip can surface them.
+ */
+function applyLlmSuggestionsToCart(
+  dtos: OrderDTO[],
+  team: PlayerTeam,
+  set: SetFn,
+  get: () => AppState,
+): { staged: number; rejected: string[] } {
+  const state = get();
+  const sc = state.scenario;
+  if (!sc) return { staged: 0, rejected: ["scenario not loaded"] };
+
+  const rejected: string[] = [];
+  const built: StagedOrder[] = [];
+
+  for (const dto of dtos) {
+    const order = buildStagedFromDto(dto, team, sc, rejected);
+    if (order) built.push(order);
+  }
+
+  if (built.length === 0) {
+    return { staged: 0, rejected };
+  }
+
+  set((s) => {
+    if (s.roundReady[team]) {
+      rejected.push("team is ready; orders not staged");
+      return s;
+    }
+    let teamOrders = s.stagedOrders[team];
+    for (const o of built) {
+      teamOrders = dedupeByOwner(teamOrders, o);
+      teamOrders = [...teamOrders, o];
+    }
+    return {
+      stagedOrders: { ...s.stagedOrders, [team]: teamOrders },
+    };
+  });
+
+  return { staged: built.length, rejected };
+}
+
+function buildStagedFromDto(
+  dto: OrderDTO,
+  team: PlayerTeam,
+  sc: ScenarioSnapshot,
+  rejected: string[],
+): StagedOrder | null {
+  const factionAllegiance = (factionId: string): "red" | "blue" | "neutral" | undefined =>
+    sc.factions.find((f) => f.id === factionId)?.allegiance;
+
+  switch (dto.kind) {
+    case "move": {
+      const u = sc.units.find((x) => x.id === dto.unit_id);
+      if (!u) return rej(rejected, dto, "unknown unit");
+      if (factionAllegiance(u.faction_id) !== team) return rej(rejected, dto, "unit not on team");
+      const order: StagedMoveOrder = {
+        id: dto.order_id || newOrderId("ord.move"),
+        kind: "move", team, source: "llm",
+        unitId: dto.unit_id, mode: dto.mode,
+        origin: [u.position[0], u.position[1]],
+        destination: [dto.destination[0], dto.destination[1]],
+      };
+      return order;
+    }
+    case "entrench": {
+      const u = sc.units.find((x) => x.id === dto.unit_id);
+      if (!u) return rej(rejected, dto, "unknown unit");
+      if (factionAllegiance(u.faction_id) !== team) return rej(rejected, dto, "unit not on team");
+      const order: StagedEntrenchOrder = {
+        id: dto.order_id || newOrderId("ord.entrench"),
+        kind: "entrench", team, source: "llm",
+        unitId: dto.unit_id, unitName: u.name,
+      };
+      return order;
+    }
+    case "engage": {
+      const a = sc.units.find((x) => x.id === dto.attacker_id);
+      const t = sc.units.find((x) => x.id === dto.target_id);
+      if (!a || !t) return rej(rejected, dto, "unknown unit(s)");
+      if (factionAllegiance(a.faction_id) !== team) return rej(rejected, dto, "attacker not on team");
+      if (a.faction_id === t.faction_id) return rej(rejected, dto, "cannot engage own faction");
+      const order: StagedEngageOrder = {
+        id: dto.order_id || newOrderId("ord.engage"),
+        kind: "engage", team, source: "llm",
+        attackerId: a.id, attackerName: a.name,
+        targetId: t.id, targetName: t.name,
+        rangeKm: haversineKm(a.position, t.position),
+      };
+      return order;
+    }
+    case "rebase_air": {
+      const u = sc.units.find((x) => x.id === dto.unit_id);
+      const af = sc.airfields.find((x) => x.id === dto.airfield_id);
+      if (!u || !af) return rej(rejected, dto, "unknown unit/airfield");
+      if (u.domain !== "air") return rej(rejected, dto, "rebase requires an air unit");
+      if (factionAllegiance(u.faction_id) !== team) return rej(rejected, dto, "unit not on team");
+      const order: StagedRebaseAirOrder = {
+        id: dto.order_id || newOrderId("ord.rebase"),
+        kind: "rebase_air", team, source: "llm",
+        unitId: u.id, unitName: u.name,
+        airfieldId: af.id, airfieldName: af.name,
+        origin: [u.position[0], u.position[1]],
+        destination: [af.position[0], af.position[1]],
+      };
+      return order;
+    }
+    case "air_sortie": {
+      const u = sc.units.find((x) => x.id === dto.unit_id);
+      if (!u) return rej(rejected, dto, "unknown unit");
+      if (u.domain !== "air") return rej(rejected, dto, "sortie requires an air unit");
+      if (factionAllegiance(u.faction_id) !== team) return rej(rejected, dto, "unit not on team");
+      const lookup = lookupTarget(sc, dto.target_kind, dto.target_id);
+      if (!lookup) return rej(rejected, dto, "unknown target");
+      const order: StagedAirSortieOrder = {
+        id: dto.order_id || newOrderId(`ord.sortie.${dto.mission}`),
+        kind: "air_sortie", team, source: "llm",
+        unitId: u.id, unitName: u.name, mission: dto.mission,
+        targetKind: dto.target_kind, targetId: dto.target_id, targetName: lookup.name,
+        origin: [u.position[0], u.position[1]],
+        targetPos: lookup.pos,
+      };
+      return order;
+    }
+    case "naval_move": {
+      const u = sc.units.find((x) => x.id === dto.unit_id);
+      if (!u) return rej(rejected, dto, "unknown unit");
+      if (u.domain !== "naval") return rej(rejected, dto, "naval move requires naval unit");
+      if (factionAllegiance(u.faction_id) !== team) return rej(rejected, dto, "unit not on team");
+      const order: StagedNavalMoveOrder = {
+        id: dto.order_id || newOrderId("ord.naval_move"),
+        kind: "naval_move", team, source: "llm",
+        unitId: u.id, unitName: u.name,
+        origin: [u.position[0], u.position[1]],
+        destination: [dto.destination[0], dto.destination[1]],
+      };
+      return order;
+    }
+    case "naval_strike": {
+      const u = sc.units.find((x) => x.id === dto.unit_id);
+      if (!u) return rej(rejected, dto, "unknown unit");
+      if (u.domain !== "naval") return rej(rejected, dto, "naval strike requires naval unit");
+      if (factionAllegiance(u.faction_id) !== team) return rej(rejected, dto, "unit not on team");
+      const lookup = lookupTarget(sc, dto.target_kind, dto.target_id);
+      if (!lookup) return rej(rejected, dto, "unknown target");
+      const order: StagedNavalStrikeOrder = {
+        id: dto.order_id || newOrderId("ord.naval_strike"),
+        kind: "naval_strike", team, source: "llm",
+        unitId: u.id, unitName: u.name,
+        targetKind: dto.target_kind, targetId: dto.target_id, targetName: lookup.name,
+        origin: [u.position[0], u.position[1]],
+        targetPos: lookup.pos,
+      };
+      return order;
+    }
+    case "missile_strike": {
+      const p = sc.missile_ranges.find((x) => x.id === dto.platform_id);
+      if (!p) return rej(rejected, dto, "unknown missile platform");
+      if (factionAllegiance(p.faction_id) !== team) return rej(rejected, dto, "platform not on team");
+      const lookup = lookupTarget(sc, dto.target_kind, dto.target_id);
+      if (!lookup) return rej(rejected, dto, "unknown target");
+      const order: StagedMissileStrikeOrder = {
+        id: dto.order_id || newOrderId("ord.missile"),
+        kind: "missile_strike", team, source: "llm",
+        platformId: p.id, platformName: p.name,
+        targetKind: dto.target_kind, targetId: dto.target_id, targetName: lookup.name,
+        origin: [p.origin[0], p.origin[1]],
+        targetPos: lookup.pos,
+      };
+      return order;
+    }
+    case "resupply": {
+      const d = sc.depots.find((x) => x.id === dto.depot_id);
+      const u = sc.units.find((x) => x.id === dto.unit_id);
+      if (!d || !u) return rej(rejected, dto, "unknown depot/unit");
+      if (factionAllegiance(d.faction_id) !== team) return rej(rejected, dto, "depot not on team");
+      const order: StagedResupplyOrder = {
+        id: dto.order_id || newOrderId("ord.resupply"),
+        kind: "resupply", team, source: "llm",
+        depotId: d.id, depotName: d.name,
+        unitId: u.id, unitName: u.name,
+      };
+      return order;
+    }
+    case "interdict_supply": {
+      const sl = sc.supply_lines.find((x) => x.id === dto.supply_line_id);
+      if (!sl) return rej(rejected, dto, "unknown supply line");
+      let origin: [number, number];
+      let platformName: string;
+      let factionId: string;
+      if (dto.platform_kind === "air_wing") {
+        const u = sc.units.find((x) => x.id === dto.platform_id);
+        if (!u || u.domain !== "air") return rej(rejected, dto, "invalid air platform");
+        origin = [u.position[0], u.position[1]];
+        platformName = u.name;
+        factionId = u.faction_id;
+      } else {
+        const m = sc.missile_ranges.find((x) => x.id === dto.platform_id);
+        if (!m || m.category === "sam") return rej(rejected, dto, "invalid missile platform");
+        origin = [m.origin[0], m.origin[1]];
+        platformName = m.name;
+        factionId = m.faction_id;
+      }
+      if (factionAllegiance(factionId) !== team) return rej(rejected, dto, "platform not on team");
+      const mid = supplyLineMidpoint(sl.path);
+      const order: StagedInterdictSupplyOrder = {
+        id: dto.order_id || newOrderId("ord.interdict"),
+        kind: "interdict_supply", team, source: "llm",
+        platformKind: dto.platform_kind, platformId: dto.platform_id, platformName,
+        supplyLineId: sl.id, supplyLineName: sl.name,
+        origin, targetPos: mid,
+      };
+      return order;
+    }
+  }
+}
+
+function rej(into: string[], dto: OrderDTO, reason: string): null {
+  into.push(`${dto.order_id || dto.kind}: ${reason}`);
+  return null;
 }

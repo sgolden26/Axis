@@ -13,6 +13,9 @@ export const SOURCE_ASSETS = "axis-assets";
 export const LAYER_ASSET_DOT = "axis-asset-dot";
 export const LAYER_ASSET_LABEL = "axis-asset-label";
 export const LAYER_ASSET_PLATE = "axis-asset-plate";
+export const SOURCE_DOCK_BADGE = "axis-dock-badge";
+export const LAYER_DOCK_BADGE_PLATE = "axis-dock-badge-plate";
+export const LAYER_DOCK_BADGE_TEXT = "axis-dock-badge-text";
 
 export type AssetKind = "depot" | "airfield" | "naval_base" | "border_crossing";
 
@@ -124,6 +127,91 @@ export const assetDotLayer: LayerSpecification = {
     "icon-halo-color": "#070a0e",
     "icon-halo-width": 0.6,
     "icon-opacity": 0.98,
+  },
+};
+
+interface DockBadgeProps {
+  asset_id: string;
+  count: number;
+  color: string;
+  label: string;
+}
+
+/** Build the dock-badge source: one feature per asset that has docked units.
+ *  Position is the asset's location; the layers offset the badge so it sits
+ *  off the asset icon's lower-right corner. The faction colour drives the
+ *  plate stroke; the count lives in `label` ready for the text layer. */
+export function dockBadgeFeatureCollection(
+  depots: Depot[],
+  airfields: Airfield[],
+  naval: NavalBase[],
+  factionsById: Map<string, Faction>,
+  assetToUnits: Map<string, string[]>,
+): GeoJSON.FeatureCollection<GeoJSON.Point, DockBadgeProps> {
+  const features: Feature<GeoJSON.Point, DockBadgeProps>[] = [];
+  const push = (
+    id: string,
+    factionId: string,
+    pos: [number, number],
+  ) => {
+    const list = assetToUnits.get(id);
+    if (!list || list.length === 0) return;
+    const color = factionsById.get(factionId)?.color ?? "#aab4c2";
+    features.push({
+      type: "Feature",
+      properties: {
+        asset_id: id,
+        count: list.length,
+        color,
+        label: String(list.length),
+      },
+      geometry: { type: "Point", coordinates: pos },
+    });
+  };
+  for (const a of airfields) push(a.id, a.faction_id, a.position);
+  for (const n of naval) push(n.id, n.faction_id, n.position);
+  for (const d of depots) push(d.id, d.faction_id, d.position);
+  return { type: "FeatureCollection", features };
+}
+
+/** Faction-tinted plate hugging the asset icon's lower-right corner. */
+export const dockBadgePlateLayer: LayerSpecification = {
+  id: LAYER_DOCK_BADGE_PLATE,
+  type: "circle",
+  source: SOURCE_DOCK_BADGE,
+  paint: {
+    "circle-color": "#0b0f14",
+    "circle-stroke-color": ["get", "color"],
+    "circle-stroke-width": 1.4,
+    "circle-radius": [
+      "interpolate", ["linear"], ["zoom"],
+      3, 5, 6, 7, 8, 8.5,
+    ],
+    "circle-opacity": 0.95,
+    "circle-translate": [10, -10],
+  },
+};
+
+/** Mono-style count atop the dock plate. */
+export const dockBadgeTextLayer: LayerSpecification = {
+  id: LAYER_DOCK_BADGE_TEXT,
+  type: "symbol",
+  source: SOURCE_DOCK_BADGE,
+  layout: {
+    "text-field": ["get", "label"],
+    "text-font": ["Open Sans Semibold"],
+    "text-size": [
+      "interpolate", ["linear"], ["zoom"],
+      3, 9, 6, 10, 8, 11,
+    ],
+    "text-allow-overlap": true,
+    "text-ignore-placement": true,
+    "text-offset": [0.7, -0.7],
+  },
+  paint: {
+    "text-color": ["get", "color"],
+    "text-halo-color": "#070a0e",
+    "text-halo-width": 1.0,
   },
 };
 

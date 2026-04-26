@@ -26,9 +26,21 @@ export type StagedOrder =
 
 export type StagedOrderKind = StagedOrder["kind"];
 
+/** Provenance tag for a staged order. "user" = hand-built via map-pick or
+ *  sidebar; "llm" = injected by the AssistantBar's order suggester. The
+ *  cart and on-map overlay key off this to render an AI badge / glow.
+ *  Treated as "user" when absent so existing staging helpers stay terse. */
+export type StagedOrderSource = "user" | "llm";
+
 interface StagedBase {
   id: string;
   team: PlayerTeam;
+  source?: StagedOrderSource;
+}
+
+/** Convenience: defaults absent `source` to `"user"`. */
+export function stagedOrderSource(o: StagedOrder): StagedOrderSource {
+  return o.source ?? "user";
 }
 
 export interface StagedMoveOrder extends StagedBase {

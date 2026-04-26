@@ -65,11 +65,13 @@ function renderToImageData(draw: Drawer): ImageData | null {
   return ctx.getImageData(0, 0, ICON_PX, ICON_PX);
 }
 
-/* Skyline: three ascending blocks reading as "settlement". */
+/* Skyline: three chunky ascending blocks plus an antenna spire so the icon
+ * stays legible at small sizes. Designed to fill ~70% of the 32px canvas. */
 function drawCity(ctx: CanvasRenderingContext2D): void {
-  ctx.fillRect(7, 18, 5, 8);
-  ctx.fillRect(13, 11, 6, 15);
-  ctx.fillRect(20, 15, 5, 11);
+  ctx.fillRect(3, 18, 8, 11);
+  ctx.fillRect(12, 8, 9, 21);
+  ctx.fillRect(22, 13, 7, 16);
+  ctx.fillRect(15, 3, 3, 6);
 }
 
 /* Crate: outlined square with a diagonal X — supplies cached. */

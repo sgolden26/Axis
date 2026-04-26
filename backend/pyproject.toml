@@ -13,6 +13,7 @@ dependencies = [
     "typer>=0.12",
     "fastapi>=0.110",
     "uvicorn>=0.29",
+    "openai>=1.40",
 ]
 
 [project.optional-dependencies]

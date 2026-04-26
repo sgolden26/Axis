@@ -82,14 +82,15 @@ class TheaterStore:
             snapshot = SnapshotExporter(self._theater).to_dict()
             return result, snapshot
 
-    def apply_round(
-        self, batches: list[OrderBatch]
-    ) -> tuple[RoundExecutionResult, dict[str, Any]]:
-        """Execute a hot-seat round (multiple per-team batches) atomically."""
+    def with_theater(self, fn):
+        """Run `fn(theater)` while holding the store lock. Returns whatever `fn` returns.
+
+        Used by read-only consumers (e.g. the LLM order suggester) that need
+        direct access to the live theatre without going through the JSON
+        snapshot path.
+        """
         with self._lock:
-            result = execute_round(self._theater, batches)
-            snapshot = SnapshotExporter(self._theater).to_dict()
-            return result, snapshot
+            return fn(self._theater)
 
 
 _store: TheaterStore | None = None
