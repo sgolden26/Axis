@@ -6,11 +6,15 @@ interface Props {
 
 export function KeyValueRow({ label, value, mono = true }: Props) {
   return (
-    <div className="flex items-baseline justify-between px-4 py-1.5 text-xs">
-      <span className="text-ink-200 uppercase tracking-wider2 text-[10px] font-mono">
+    <div className="flex items-baseline justify-between gap-3 px-4 py-1.5 text-xs">
+      <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
         {label}
       </span>
-      <span className={`text-ink-50 ${mono ? "font-mono" : ""}`}>{value}</span>
+      <span
+        className={`min-w-0 truncate text-right text-ink-50 ${mono ? "font-mono text-[11px]" : "text-[12px]"}`}
+      >
+        {value}
+      </span>
     </div>
   );
 }

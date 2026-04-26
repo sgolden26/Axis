@@ -35,9 +35,11 @@ class Unit(ABC):
     strength: float = 1.0  # share of nominal combat power remaining
     readiness: float = 1.0  # ability to fight now (training, supply, fatigue)
     morale: float = 1.0  # cohesion / will to fight; driven by intel layer later
+    entrenchment: float = 0.0  # 0..1 dug-in level; raises defence in engagements
     echelon: str = "brigade"
     callsign: str = ""
     country_id: str | None = None
+    home_base_id: str | None = None  # airfield/naval base id (rebasing target validation)
     available_actions: tuple[str, ...] = field(default_factory=tuple)
     metadata: dict[str, object] = field(default_factory=dict)
 
@@ -45,6 +47,7 @@ class Unit(ABC):
         _validate_unit_interval("strength", self.strength)
         _validate_unit_interval("readiness", self.readiness)
         _validate_unit_interval("morale", self.morale)
+        _validate_unit_interval("entrenchment", self.entrenchment)
         if not self.id:
             raise ValueError("Unit.id must be non-empty")
 

@@ -47,8 +47,18 @@ class Settings:
     """Articles with |tone| below this threshold are considered noise and
     dropped before classification."""
 
-    gdelt_request_timeout_s: float = 10.0
-    """HTTP timeout for individual GDELT DOC API calls."""
+    gdelt_request_timeout_s: float = 60.0
+    """HTTP timeout for individual GDELT DOC API calls. The free-tier
+    endpoint's TLS handshake alone routinely takes 15-25s and occasionally
+    spikes past 30s; a generous timeout lets the first handshake of a batch
+    actually complete. Once it does, all remaining regions reuse the same
+    connection (no further handshakes) and respond in ~2s each."""
+
+    gdelt_cache_ttl_hours: float = 12.0
+    """How long a successful live fetch is reused before we hit the API
+    again. The morale aggregator decays events over ~5 days so a half-day
+    cache is well within the useful window and dramatically reduces the
+    chance of a transient network blip degrading the demo to curated."""
 
     live_fallback_source: str = "curated"
     """Source used when `live_news_enabled` is True but the live fetch

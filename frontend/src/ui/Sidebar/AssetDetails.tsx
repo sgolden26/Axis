@@ -10,10 +10,14 @@ import type {
   NavalBase,
   SupplyLine,
 } from "@/types/scenario";
+import { useAppStore } from "@/state/store";
+import { isFactionControllableByPlayerTeam } from "@/state/playerTeam";
 import { SectionHeader } from "./primitives/SectionHeader";
 import { KeyValueRow } from "./primitives/KeyValueRow";
 import { FactionTag } from "./primitives/FactionTag";
 import { MetricBar } from "./primitives/MetricBar";
+import { ActionDraftPanel } from "./primitives/ActionDraftPanel";
+import { ResupplyPicker } from "./primitives/ResupplyPicker";
 
 function Header({
   kind,
@@ -26,15 +30,23 @@ function Header({
   faction: Faction;
   id: string;
 }) {
+  const parts = kind.split(" · ");
   return (
     <div className="hairline-b px-4 pb-3 pt-4">
-      <div className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
-        {kind}
+      <div className="font-mono text-[9px] uppercase tracking-wider2 text-ink-300">
+        {parts.map((p, i) => (
+          <span key={i}>
+            {i > 0 && <span className="px-1 text-ink-400">/</span>}
+            {p}
+          </span>
+        ))}
       </div>
-      <div className="mt-1 text-lg font-semibold text-ink-50">{name}</div>
+      <div className="mt-1 text-[18px] font-semibold leading-tight tracking-tight text-ink-50">
+        {name}
+      </div>
       <div className="mt-2 flex items-center gap-2">
         <FactionTag faction={faction} />
-        <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+        <span className="font-mono text-[10px] tracking-wider2 text-ink-300">
           {id}
         </span>
       </div>
@@ -71,6 +83,8 @@ function Pos({ pos }: { pos: [number, number] }) {
 }
 
 export function DepotDetail({ depot, faction }: { depot: Depot; faction: Faction }) {
+  const playerTeam = useAppStore((s) => s.playerTeam);
+  const playerOwns = isFactionControllableByPlayerTeam(faction, playerTeam);
   return (
     <div className="flex h-full flex-col">
       <Header kind="logistics depot" name={depot.name} faction={faction} id={depot.id} />
@@ -79,7 +93,18 @@ export function DepotDetail({ depot, faction }: { depot: Depot; faction: Faction
       <SectionHeader label="metrics" />
       <MetricBar label="capacity" value={depot.capacity} />
       <MetricBar label="fill" value={depot.fill} />
-      <ActionList actions={depot.available_actions} />
+      <SectionHeader label="orders" />
+      {playerOwns ? (
+        <div className="px-3 py-2">
+          <div className="grid grid-cols-2 gap-1.5">
+            <ResupplyPicker side="from_depot" depotId={depot.id} />
+          </div>
+        </div>
+      ) : (
+        <div className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+          · controlled by {faction.allegiance} team · switch sides to issue orders
+        </div>
+      )}
     </div>
   );
 }
@@ -236,6 +261,16 @@ export function MissileDetail({
   missile: MissileRange;
   faction: Faction;
 }) {
+  const playerTeam = useAppStore((s) => s.playerTeam);
+  const startActionDraft = useAppStore((s) => s.startActionDraft);
+  const actionDraft = useAppStore((s) => s.actionDraft);
+  const playerOwns = isFactionControllableByPlayerTeam(faction, playerTeam);
+  const offensive = missile.category !== "sam";
+  const draftHere =
+    actionDraft &&
+    "platformId" in actionDraft &&
+    actionDraft.platformId === missile.id;
+
   return (
     <div className="flex h-full flex-col">
       <Header
@@ -253,9 +288,60 @@ export function MissileDetail({
         value={missile.beam_deg >= 360 ? "omni" : `${Math.round(missile.heading_deg)}°`}
       />
       <KeyValueRow label="beam" value={`${Math.round(missile.beam_deg)}°`} />
-      <ActionList actions={missile.available_actions} />
+
+      <SectionHeader label="orders" />
+      {!playerOwns ? (
+        <div className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+          · controlled by {faction.allegiance} team · switch sides to issue orders
+        </div>
+      ) : !offensive ? (
+        <div className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+          · SAM platforms are defensive only · they intercept hostile sorties automatically
+        </div>
+      ) : (
+        <div className="px-3 py-2">
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={() =>
+                startActionDraft({ kind: "missile_strike", platformId: missile.id })
+              }
+              title="Stand-off launch against a fixed asset or detected unit"
+              className={btnClass(actionDraft?.kind === "missile_strike" && !!draftHere)}
+            >
+              Missile strike
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                startActionDraft({
+                  kind: "interdict_supply",
+                  platformKind: "missile_range",
+                  platformId: missile.id,
+                })
+              }
+              title="Strike a hostile supply line"
+              className={btnClass(
+                actionDraft?.kind === "interdict_supply" && !!draftHere,
+              )}
+            >
+              Interdict supply
+            </button>
+          </div>
+        </div>
+      )}
+
+      {draftHere && actionDraft && <ActionDraftPanel draft={actionDraft} />}
     </div>
   );
+}
+
+function btnClass(active: boolean): string {
+  return `border px-2 py-1.5 text-left font-mono text-[10px] uppercase tracking-wider2 transition-colors ${
+    active
+      ? "border-faction-nato/60 bg-faction-nato/10 text-faction-nato"
+      : "border-[var(--hairline)] bg-ink-700/30 text-ink-100 hover:border-[var(--hairline-strong)] hover:bg-ink-700/60 hover:text-ink-50"
+  }`;
 }
 
 export function AorDetail({
@@ -280,11 +366,13 @@ export function FrontlineDetail({ frontline }: { frontline: Frontline }) {
   return (
     <div className="flex h-full flex-col">
       <div className="hairline-b px-4 pb-3 pt-4">
-        <div className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+        <div className="font-mono text-[9px] uppercase tracking-wider2 text-ink-300">
           line of contact
         </div>
-        <div className="mt-1 text-lg font-semibold text-ink-50">{frontline.name}</div>
-        <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+        <div className="mt-1 text-[18px] font-semibold leading-tight tracking-tight text-ink-50">
+          {frontline.name}
+        </div>
+        <span className="font-mono text-[10px] tracking-wider2 text-ink-300">
           {frontline.id}
         </span>
       </div>

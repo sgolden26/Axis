@@ -8,7 +8,12 @@ from typing import Any
 from axis import scenarios
 from axis.domain.theater import Theater
 from axis.serialization.snapshot import SnapshotExporter
-from axis.sim.orders import ExecutionResult, OrderBatch
+from axis.sim.orders import (
+    ExecutionResult,
+    OrderBatch,
+    RoundExecutionResult,
+    execute_round,
+)
 from axis.sim.political_engine import advance_after_batch
 
 
@@ -77,6 +82,25 @@ class TheaterStore:
                 advance_after_batch(self._theater, batch)
             snapshot = SnapshotExporter(self._theater).to_dict()
             return result, snapshot
+
+    def apply_round(
+        self, batches: list[OrderBatch]
+    ) -> tuple[RoundExecutionResult, dict[str, Any]]:
+        """Execute a hot-seat round (multiple per-team batches) atomically."""
+        with self._lock:
+            result = execute_round(self._theater, batches)
+            snapshot = SnapshotExporter(self._theater).to_dict()
+            return result, snapshot
+
+    def with_theater(self, fn):
+        """Run `fn(theater)` while holding the store lock. Returns whatever `fn` returns.
+
+        Used by read-only consumers (e.g. the LLM order suggester) that need
+        direct access to the live theatre without going through the JSON
+        snapshot path.
+        """
+        with self._lock:
+            return fn(self._theater)
 
 
 _store: TheaterStore | None = None

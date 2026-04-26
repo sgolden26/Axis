@@ -41,13 +41,15 @@ export function TerritoryDetail({ territory, faction }: Props) {
   return (
     <div className="flex h-full flex-col">
       <div className="hairline-b px-4 pb-3 pt-4">
-        <div className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+        <div className="font-mono text-[9px] uppercase tracking-wider2 text-ink-300">
           territory
         </div>
-        <div className="mt-1 text-lg font-semibold text-ink-50">{territory.name}</div>
+        <div className="mt-1 text-[18px] font-semibold leading-tight tracking-tight text-ink-50">
+          {territory.name}
+        </div>
         <div className="mt-2 flex items-center gap-2">
           <FactionTag faction={faction} />
-          <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+          <span className="font-mono text-[10px] tracking-wider2 text-ink-300">
             {territory.id}
           </span>
         </div>
@@ -55,8 +57,8 @@ export function TerritoryDetail({ territory, faction }: Props) {
 
       <SectionHeader label="control" />
       <MetricBar label="effective control" value={territory.control} />
-      <div className="flex items-baseline justify-between px-4 py-1.5 text-xs">
-        <span className="text-ink-200 uppercase tracking-wider2 text-[10px] font-mono">
+      <div className="flex items-center justify-between px-4 py-1.5">
+        <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
           country
         </span>
         <CountryBadge countryId={territory.country_id ?? null} />

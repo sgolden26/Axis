@@ -13,13 +13,17 @@ export function CityDetail({ city, faction }: Props) {
   return (
     <div className="flex h-full flex-col">
       <div className="hairline-b px-4 pb-3 pt-4">
-        <div className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
-          city · {city.importance}
+        <div className="font-mono text-[9px] uppercase tracking-wider2 text-ink-300">
+          city
+          <span className="px-1 text-ink-400">/</span>
+          {city.importance}
         </div>
-        <div className="mt-1 text-lg font-semibold text-ink-50">{city.name}</div>
+        <div className="mt-1 text-[18px] font-semibold leading-tight tracking-tight text-ink-50">
+          {city.name}
+        </div>
         <div className="mt-2 flex items-center gap-2">
           <FactionTag faction={faction} />
-          <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
+          <span className="font-mono text-[10px] tracking-wider2 text-ink-300">
             {city.id}
           </span>
         </div>
@@ -34,8 +38,8 @@ export function CityDetail({ city, faction }: Props) {
         label="population"
         value={city.population.toLocaleString("en-GB")}
       />
-      <div className="flex items-baseline justify-between px-4 py-1.5 text-xs">
-        <span className="text-ink-200 uppercase tracking-wider2 text-[10px] font-mono">
+      <div className="flex items-center justify-between px-4 py-1.5">
+        <span className="font-mono text-[10px] uppercase tracking-wider2 text-ink-200">
           country
         </span>
         <CountryBadge countryId={city.country_id ?? null} />

@@ -4,7 +4,7 @@ import {
   type FlowNode,
   buildFactorGraph,
 } from "@/decision/buildFactorGraph";
-import type { RegionIntel } from "@/types/intel";
+import type { IntelEvent, RegionIntel } from "@/types/intel";
 
 const CATEGORY_SHORT: Record<string, string> = {
   protest: "Protest",
@@ -70,6 +70,9 @@ interface Props {
   actions: Action[];
   selectedActionId: string | null;
   onActionSelect: (id: string) => void;
+  /** When provided, signal nodes become clickable and call this with the
+   * underlying IntelEvent so callers can open an article viewer. */
+  onSignalClick?: (event: IntelEvent) => void;
 }
 
 type ViewBox = [number, number, number, number];
@@ -80,11 +83,18 @@ export function FactorFlowGraph({
   actions,
   selectedActionId,
   onActionSelect,
+  onSignalClick,
 }: Props) {
   const { nodes, edges, viewW, viewH } = useMemo(
     () => buildFactorGraph(region, actions, territoryName),
     [region, actions, territoryName],
   );
+
+  const eventBySignalId = useMemo(() => {
+    const m = new Map<string, IntelEvent>();
+    for (const e of region.recent_events) m.set(`sig-${e.id}`, e);
+    return m;
+  }, [region.recent_events]);
 
   const byId = useMemo(() => {
     const m = new Map<string, FlowNode>();
@@ -228,8 +238,19 @@ export function FactorFlowGraph({
 
           {nodes.map((n) => {
             if (n.kind === "signal") {
+              const ev = eventBySignalId.get(n.id);
+              const clickable = Boolean(onSignalClick && ev);
               return (
-                <g key={n.id} pointerEvents="none">
+                <g
+                  key={n.id}
+                  pointerEvents={clickable ? "all" : "none"}
+                  onClick={
+                    clickable && ev
+                      ? () => onSignalClick?.(ev)
+                      : undefined
+                  }
+                  className={clickable ? "cursor-pointer" : undefined}
+                >
                   <rect
                     x={n.x}
                     y={n.y}
@@ -245,6 +266,7 @@ export function FactorFlowGraph({
                     y={n.y + 16}
                     className="fill-ink-100"
                     style={{ fontSize: 9, fontFamily: "ui-monospace, monospace" }}
+                    pointerEvents="none"
                   >
                     {truncate(n.label, 36)}
                   </text>
@@ -253,6 +275,7 @@ export function FactorFlowGraph({
                     y={n.y + 32}
                     className="fill-ink-300"
                     style={{ fontSize: 8, fontFamily: "ui-monospace, monospace" }}
+                    pointerEvents="none"
                   >
                     {n.sublabel ?? "signal"}
                   </text>

@@ -25,6 +25,7 @@ export function DecisionImmersive() {
   const selectedActionId = useAppStore((s) => s.selectedActionId);
   const selectAction = useAppStore((s) => s.selectAction);
   const playerTeam = useAppStore((s) => s.playerTeam);
+  const openArticle = useAppStore((s) => s.openArticle);
 
   /** Bottom outcome is shown only after the user picks an action in this session. */
   const [choseAction, setChoseAction] = useState(false);
@@ -216,6 +217,7 @@ export function DecisionImmersive() {
                     actions={actions}
                     selectedActionId={choseAction ? (selectedAction?.id ?? null) : null}
                     onActionSelect={onActionPick}
+                    onSignalClick={openArticle}
                   />
                 ) : (
                   <div className="p-4 font-mono text-[11px] text-ink-200">

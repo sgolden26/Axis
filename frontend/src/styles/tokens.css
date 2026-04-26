@@ -18,13 +18,19 @@
   --accent-danger: #ff5a5a;
   --accent-ok: #7ad492;
 
-  --grid-line: rgba(255, 255, 255, 0.025);
+  --grid-line: rgba(255, 255, 255, 0.02);
+  --hairline: rgba(255, 255, 255, 0.06);
+  --hairline-soft: rgba(255, 255, 255, 0.035);
+  --hairline-strong: rgba(255, 255, 255, 0.10);
+  --accent-blue: #5aa9ff;
 
   font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: "ss01", "cv11";
   color: var(--ink-50);
   background: var(--ink-900);
   color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html,
@@ -38,8 +44,13 @@ body,
 body {
   background-image:
     linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-  background-size: 32px 32px;
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    radial-gradient(
+      ellipse 80% 60% at 50% -10%,
+      rgba(90, 169, 255, 0.04),
+      transparent 60%
+    );
+  background-size: 32px 32px, 32px 32px, 100% 100%;
 }
 
 ::selection {
@@ -51,23 +62,51 @@ body {
 }
 
 .hairline {
-  border-color: var(--ink-500);
+  border-color: var(--hairline);
 }
 
 .hairline-b {
-  border-bottom: 1px solid var(--ink-500);
+  border-bottom: 1px solid var(--hairline);
 }
 
 .hairline-t {
-  border-top: 1px solid var(--ink-500);
+  border-top: 1px solid var(--hairline);
 }
 
 .hairline-l {
-  border-left: 1px solid var(--ink-500);
+  border-left: 1px solid var(--hairline);
 }
 
 .hairline-r {
-  border-right: 1px solid var(--ink-500);
+  border-right: 1px solid var(--hairline);
+}
+
+.hairline-soft-b {
+  border-bottom: 1px solid var(--hairline-soft);
+}
+
+.panel-surface {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.012), transparent 120px),
+    var(--ink-800);
+}
+
+.panel-section-bg {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.02),
+    transparent 60%
+  );
+}
+
+.row-selected {
+  background: linear-gradient(
+    90deg,
+    rgba(90, 169, 255, 0.10),
+    rgba(90, 169, 255, 0.02) 60%,
+    transparent
+  );
+  box-shadow: inset 2px 0 0 var(--accent-blue);
 }
 
 .glow-selection {

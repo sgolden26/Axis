@@ -15,6 +15,10 @@ import { KeyboardShortcuts } from "@/ui/KeyboardShortcuts";
 import { DecisionImmersive } from "@/ui/DecisionEngine/DecisionImmersive";
 import { MoveLimitToast } from "@/ui/MoveLimitToast";
 import { OrdersCart } from "@/ui/Orders/OrdersCart";
+import { AssistantBar } from "@/ui/Assistant/AssistantBar";
+import { ArticleDrawer } from "@/ui/Article/ArticleDrawer";
+import { PhasePill } from "@/ui/Replay/PhasePill";
+import { DamageChips } from "@/ui/Replay/DamageChips";
 
 export function App() {
   const setScenario = useAppStore((s) => s.setScenario);
@@ -61,7 +65,10 @@ export function App() {
         <LeftDock />
         <main className="relative flex-1 overflow-hidden">
           <MapView />
+          <DamageChips />
+          <PhasePill />
           <OrdersCart />
+          <AssistantBar />
           <CountryRoster />
           <Minimap />
           <HoverCard />
@@ -71,6 +78,7 @@ export function App() {
           {loadError && <ErrorOverlay message={loadError} />}
         </main>
         <RightPanel />
+        <ArticleDrawer />
       </div>
       <BottomBar />
       <DecisionImmersive />

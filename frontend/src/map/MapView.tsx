@@ -10,7 +10,6 @@ import { loadBorders, type BordersBundle } from "@/api/loadBorders";
 import { setMapInstance } from "./mapRef";
 import {
   baseStyle,
-  LAYER_CITY_DOT,
   LAYER_CITY_HALO,
   LAYER_CITY_LABEL,
   LAYER_UNIT_DOT,
@@ -19,11 +18,15 @@ import {
   SOURCE_UNITS,
 } from "./style";
 import {
-  cityDotLayer,
   cityFeatureCollection,
   cityHaloLayer,
+  cityIconLayer,
   cityLabelLayer,
+  cityPlateLayer,
+  LAYER_CITY_ICON,
+  LAYER_CITY_PLATE,
 } from "./layers/cityLayer";
+import { registerMarkerIcons } from "./layers/iconSprites";
 import {
   registerUnitIcons,
   unitDotLayer,
@@ -60,9 +63,15 @@ import {
   assetDotLayer,
   assetFeatureCollection,
   assetLabelLayer,
+  assetPlateLayer,
+  dockBadgeFeatureCollection,
+  dockBadgePlateLayer,
+  dockBadgeTextLayer,
   LAYER_ASSET_DOT,
   LAYER_ASSET_LABEL,
+  LAYER_ASSET_PLATE,
   SOURCE_ASSETS,
+  SOURCE_DOCK_BADGE,
 } from "./layers/assetLayer";
 import {
   frontlineBufferCollection,
@@ -91,8 +100,39 @@ import {
   LAYER_MOVEMENT_ROUTE,
   LAYER_MOVEMENT_DEST,
 } from "./layers/movementOverlay";
+import {
+  ensureSelectionSource,
+  registerSelectionIcon,
+  selectionFeatureCollection,
+  selectionReticleLayer,
+  SOURCE_SELECTION,
+} from "./layers/selectionLayer";
+import {
+  ensureActionDraftOverlay,
+  refreshActionDraftOverlay,
+} from "./layers/actionDraftOverlay";
+import {
+  ensureStagedOrdersOverlay,
+  refreshStagedOrdersOverlay,
+} from "./layers/stagedOrdersOverlay";
+import {
+  ensureStrikeArcLayer,
+  arcsFromReplayEvents,
+  playStrikeAnimation,
+  clearStrikeArcs,
+} from "./layers/strikeArcLayer";
+import {
+  missileFeatureCollection,
+  missileFillLayer,
+  missileLineLayer,
+  SOURCE_MISSILE,
+  LAYER_MISSILE_FILL,
+  LAYER_MISSILE_LINE,
+} from "./layers/coverageLayer";
 import { clampToGeodesicDisk, haversineKm } from "./geodesic";
 import { groundMoveRadiusKm } from "@/state/groundMove";
+import { snapToCandidate } from "@/state/actionDraft";
+import { computeDocking, computeVisibleUnitIds } from "@/state/visibility";
 
 // Ordered top-most first. queryRenderedFeatures returns features in render order
 // (top -> bottom); we keep this list aligned with the layer paint order in
@@ -101,18 +141,50 @@ const CLICKABLE_LAYERS = [
   LAYER_UNIT_GLYPH,
   LAYER_UNIT_DOT,
   LAYER_UNIT_HALO,
-  LAYER_CITY_DOT,
+  LAYER_CITY_ICON,
+  LAYER_CITY_PLATE,
   LAYER_CITY_HALO,
   LAYER_ASSET_LABEL,
   LAYER_ASSET_DOT,
+  LAYER_ASSET_PLATE,
   LAYER_FRONTLINE_LINE,
   LAYER_SUPPLY_DASH,
   LAYER_FRONTLINE_BUFFER,
+  LAYER_MISSILE_FILL,
   LAYER_OBLAST_FILL,
   LAYER_COUNTRY_FILL,
 ];
 
 type HoverState = { source: string; id: string | number } | null;
+
+interface ClickStack {
+  x: number;
+  y: number;
+  /** Stable key for the resolved selectable list at the click point. */
+  key: string;
+  /** Index of the selectable currently selected within the stack. */
+  index: number;
+  /** Resolved selectables in render order; index N is the next pick. */
+  picks: { kind: SelectableKind; id: string }[];
+}
+
+const STACK_PIXEL_TOLERANCE = 6;
+
+function dedupeResolved(
+  feats: MapGeoJSONFeature[],
+): { kind: SelectableKind; id: string }[] {
+  const seen = new Set<string>();
+  const out: { kind: SelectableKind; id: string }[] = [];
+  for (const f of feats) {
+    const r = resolveSelectableFromFeature(f);
+    if (!r) continue;
+    const k = `${r.kind}:${r.id}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(r);
+  }
+  return out;
+}
 
 /** Clicks within this distance of the draft origin exit move planning. */
 const MOVE_ORIGIN_EXIT_KM = 0.2;
@@ -125,6 +197,7 @@ const SOURCE_TO_KIND: Record<string, SelectableKind> = {
   [SOURCE_FRONTLINE_BUFFER]: "frontline",
   [SOURCE_SUPPLY]: "supply_line",
   [SOURCE_COUNTRIES]: "country",
+  [SOURCE_MISSILE]: "missile_range",
 };
 
 const ASSET_KIND_TO_SELECTABLE: Record<string, SelectableKind> = {
@@ -134,13 +207,19 @@ const ASSET_KIND_TO_SELECTABLE: Record<string, SelectableKind> = {
   border_crossing: "border_crossing",
 };
 
+function clickableFeaturesAt(
+  map: MlMap,
+  point: maplibregl.PointLike,
+): MapGeoJSONFeature[] {
+  const layers = CLICKABLE_LAYERS.filter((l) => map.getLayer(l));
+  return map.queryRenderedFeatures(point, { layers });
+}
+
 function topClickableFeature(
   map: MlMap,
   point: maplibregl.PointLike,
 ): MapGeoJSONFeature | null {
-  const layers = CLICKABLE_LAYERS.filter((l) => map.getLayer(l));
-  const features = map.queryRenderedFeatures(point, { layers });
-  return features[0] ?? null;
+  return clickableFeaturesAt(map, point)[0] ?? null;
 }
 
 function resolveSelectableFromFeature(
@@ -173,6 +252,7 @@ export function MapView() {
   const mapRef = useRef<MlMap | null>(null);
   const hoverRef = useRef<HoverState>(null);
   const selectionRef = useRef<Selection>(null);
+  const clickStackRef = useRef<ClickStack | null>(null);
 
   const scenario = useAppStore((s) => s.scenario);
   const selection = useAppStore((s) => s.selection);
@@ -239,28 +319,68 @@ export function MapView() {
       const st = useAppStore.getState();
       const sel = st.selection;
       const drafts = st.groundMoveDrafts;
-      const topFeat = topClickableFeature(map, ev.point);
+      const click: [number, number] = [ev.lngLat.lng, ev.lngLat.lat];
+
+      // Action draft (engage / strike / rebase / etc) consumes clicks while
+      // pickingTarget. Click on origin = cancel; otherwise snap to nearest
+      // candidate within tolerance (no-op when out of range).
+      if (st.actionDraft && st.actionDraft.pickingTarget) {
+        if (haversineKm(st.actionDraft.origin, click) < MOVE_ORIGIN_EXIT_KM) {
+          st.cancelActionDraft();
+          return;
+        }
+        const snap = snapToCandidate(
+          st.actionDraft.candidates,
+          click,
+          actionDraftSnapKm(map),
+        );
+        if (snap) {
+          st.setActionDraftCandidate(snap.id);
+        }
+        return;
+      }
 
       if (sel?.kind === "unit" && drafts[sel.id]?.pickingDestination) {
-        applyGroundMoveClick(sel.id, [ev.lngLat.lng, ev.lngLat.lat]);
+        applyGroundMoveClick(sel.id, click);
         return;
       }
 
-      if (!topFeat) {
+      const stackFeats = clickableFeaturesAt(map, ev.point);
+      const picks = dedupeResolved(stackFeats);
+      if (picks.length === 0) {
+        clickStackRef.current = null;
         st.clearSelection();
         return;
       }
-      const resolved = resolveSelectableFromFeature(topFeat);
-      if (!resolved) {
-        st.clearSelection();
-        return;
+      const key = picks.map((p) => `${p.kind}:${p.id}`).join("|");
+      const prev = clickStackRef.current;
+      const px = ev.point.x;
+      const py = ev.point.y;
+      let index = 0;
+      if (
+        prev &&
+        prev.key === key &&
+        Math.abs(prev.x - px) <= STACK_PIXEL_TOLERANCE &&
+        Math.abs(prev.y - py) <= STACK_PIXEL_TOLERANCE
+      ) {
+        index = (prev.index + 1) % picks.length;
       }
-      select(resolved);
+      clickStackRef.current = { x: px, y: py, key, index, picks };
+      select(picks[index]);
     };
 
     const onMouseMove = (ev: maplibregl.MapMouseEvent) => {
       const stMove = useAppStore.getState();
       if (stMove.measureActive) return;
+      if (stMove.actionDraft && stMove.actionDraft.pickingTarget) {
+        if (hoverRef.current) {
+          map.setFeatureState(hoverRef.current, { hover: false });
+          hoverRef.current = null;
+        }
+        map.getCanvas().style.cursor = "crosshair";
+        setHover(null);
+        return;
+      }
       if (
         stMove.selection?.kind === "unit" &&
         stMove.groundMoveDrafts[stMove.selection.id]?.pickingDestination
@@ -331,6 +451,91 @@ export function MapView() {
     else map.once("load", run);
   }, [groundMoveDrafts, scenario]);
 
+  const actionDraft = useAppStore((s) => s.actionDraft);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const run = () => {
+      ensureActionDraftOverlay(map);
+      refreshActionDraftOverlay(map, actionDraft);
+    };
+    if (map.isStyleLoaded()) run();
+    else map.once("load", run);
+  }, [actionDraft]);
+
+  // Persistent staged-orders overlay for the active team. Re-renders whenever
+  // the cart changes, the player team flips, or the replay machine kicks in
+  // (so the strike-arc cinematic doesn't fight with our dashed arcs).
+  const stagedForTeam = useAppStore(
+    (s) => s.stagedOrders[s.playerTeam],
+  );
+  const replayActive = useAppStore((s) => s.replay !== null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const run = () => {
+      ensureStagedOrdersOverlay(map);
+      refreshStagedOrdersOverlay(map, stagedForTeam, scenario, {
+        suppress: replayActive,
+      });
+    };
+    if (map.isStyleLoaded()) run();
+    else map.once("load", run);
+  }, [stagedForTeam, scenario, replayActive]);
+
+  const playerTeam = useAppStore((s) => s.playerTeam);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !scenario) return;
+    const run = () => {
+      const selSrc = map.getSource(SOURCE_SELECTION) as
+        | maplibregl.GeoJSONSource
+        | undefined;
+      if (!selSrc) return;
+      const overrides = useAppStore.getState().unitPositionOverrides;
+      selSrc.setData(
+        selectionFeatureCollection(
+          scenario,
+          useAppStore.getState().selection,
+          teamReticleColor(playerTeam),
+          overrides,
+        ),
+      );
+    };
+    if (map.isStyleLoaded()) run();
+    else map.once("load", run);
+  }, [playerTeam, scenario]);
+
+  const replay = useAppStore((s) => s.replay);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const run = () => {
+      ensureStrikeArcLayer(map);
+      if (!replay) {
+        clearStrikeArcs(map);
+        return;
+      }
+      if (replay.phase === "strikes") {
+        const arcs = arcsFromReplayEvents(
+          replay.events.filter(
+            (e): e is import("@/state/replay").ReplayStrikeEvent
+              | import("@/state/replay").ReplayEngageEvent =>
+              e.kind === "strike" || e.kind === "engage",
+          ),
+        );
+        const stop = playStrikeAnimation(map, arcs, 1800);
+        return () => stop();
+      }
+      // Reports phase keeps arcs cleared (chips are HTML-overlaid).
+      if (replay.phase === "reports") clearStrikeArcs(map);
+    };
+    let cleanup: void | (() => void);
+    if (map.isStyleLoaded()) cleanup = run();
+    else map.once("load", () => { cleanup = run(); });
+    return () => { if (typeof cleanup === "function") cleanup(); };
+  }, [replay]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !scenario) return;
@@ -339,12 +544,42 @@ export function MapView() {
       if (!src) return;
       const factionsById = new Map(scenario.factions.map((f) => [f.id, f]));
       const overrides = useAppStore.getState().unitPositionOverrides;
-      const fc = unitFeatureCollection(scenario.units, factionsById, overrides);
+      const visibleUnits = filterUnitsForMap(
+        scenario,
+        useAppStore.getState().playerTeam,
+        useAppStore.getState().selection,
+      );
+      const fc = unitFeatureCollection(visibleUnits, factionsById, overrides);
       src.setData(withStringIds(fc));
+
+      const dockSrc = map.getSource(SOURCE_DOCK_BADGE) as
+        | maplibregl.GeoJSONSource
+        | undefined;
+      if (dockSrc) {
+        const docking = computeDocking(scenario);
+        const badges = dockBadgeFeatureCollection(
+          scenario.depots,
+          scenario.airfields,
+          scenario.naval_bases,
+          factionsById,
+          docking.assetToUnits,
+        );
+        dockSrc.setData(badges);
+      }
+
+      const sel = useAppStore.getState().selection;
+      if (sel?.kind === "unit") {
+        const selSrc = map.getSource(SOURCE_SELECTION) as
+          | maplibregl.GeoJSONSource
+          | undefined;
+        if (selSrc) {
+          selSrc.setData(selectionFeatureCollection(scenario, sel, teamReticleColor(useAppStore.getState().playerTeam), overrides));
+        }
+      }
     };
     if (map.isStyleLoaded()) run();
     else map.once("load", run);
-  }, [positionOverridesEpoch, scenario]);
+  }, [positionOverridesEpoch, scenario, playerTeam]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -360,6 +595,18 @@ export function MapView() {
       if (src) map.setFeatureState({ source: src, id: selection.id }, { selected: true });
       flyToSelection(map, scenario, selection, borders);
     }
+
+    const updateReticle = () => {
+      const selSrc = map.getSource(SOURCE_SELECTION) as
+        | maplibregl.GeoJSONSource
+        | undefined;
+      if (!selSrc) return;
+      const overrides = useAppStore.getState().unitPositionOverrides;
+      selSrc.setData(selectionFeatureCollection(scenario, selection, teamReticleColor(useAppStore.getState().playerTeam), overrides));
+    };
+    if (map.isStyleLoaded()) updateReticle();
+    else map.once("load", updateReticle);
+
     selectionRef.current = selection;
   }, [selection, scenario, borders]);
 
@@ -395,11 +642,13 @@ export function MapView() {
     const map = mapRef.current;
     if (!map) return;
     const st = useAppStore.getState();
-    const picking =
+    const groundPicking =
       st.selection?.kind === "unit" &&
       st.groundMoveDrafts[st.selection.id]?.pickingDestination;
-    map.getCanvas().style.cursor = measureActive || picking ? "crosshair" : "";
-  }, [measureActive, selection, groundMoveDrafts]);
+    const actionPicking = !!st.actionDraft?.pickingTarget;
+    map.getCanvas().style.cursor =
+      measureActive || groundPicking || actionPicking ? "crosshair" : "";
+  }, [measureActive, selection, groundMoveDrafts, actionDraft]);
 
   return <div ref={containerRef} className="absolute inset-0" />;
 }
@@ -423,9 +672,10 @@ function sourceForKind(kind: NonNullable<Selection>["kind"]): string | null {
     case "naval_base":
     case "border_crossing":
       return SOURCE_ASSETS;
+    case "missile_range":
+      return SOURCE_MISSILE;
     case "territory":
     case "isr_coverage":
-    case "missile_range":
     case "aor":
       return null;
   }
@@ -625,7 +875,10 @@ function addOrUpdateData(
   const factionsById = new Map(scenario.factions.map((f) => [f.id, f]));
 
   const cities = cityFeatureCollection(scenario.cities, factionsById);
-  const units = unitFeatureCollection(scenario.units, factionsById);
+  const team = useAppStore.getState().playerTeam;
+  const initialSelection = useAppStore.getState().selection;
+  const visibleUnitsForFc = filterUnitsForMap(scenario, team, initialSelection);
+  const units = unitFeatureCollection(visibleUnitsForFc, factionsById);
   const countries = countryFeatureCollection(
     scenario.countries,
     factionsById,
@@ -645,9 +898,18 @@ function addOrUpdateData(
     scenario.border_crossings,
     factionsById,
   );
+  const dockInfo = computeDocking(scenario);
+  const dockBadges = dockBadgeFeatureCollection(
+    scenario.depots,
+    scenario.airfields,
+    scenario.naval_bases,
+    factionsById,
+    dockInfo.assetToUnits,
+  );
   const frontlineLine = frontlineLineCollection(scenario.frontlines);
   const frontlineBuf = frontlineBufferCollection(scenario.frontlines);
   const supply = supplyFeatureCollection(scenario.supply_lines, factionsById);
+  const missile = missileFeatureCollection(scenario.missile_ranges, factionsById);
 
   upsertGeoJsonSource(map, SOURCE_COUNTRY_CONTEXT, context, false);
   upsertGeoJsonSource(map, SOURCE_COUNTRIES, withStringIds(countries));
@@ -658,10 +920,15 @@ function addOrUpdateData(
   upsertGeoJsonSource(map, SOURCE_CITIES, withStringIds(cities));
   upsertGeoJsonSource(map, SOURCE_UNITS, withStringIds(units));
   upsertGeoJsonSource(map, SOURCE_ASSETS, withStringIds(assets));
+  upsertGeoJsonSource(map, SOURCE_DOCK_BADGE, dockBadges, false);
+  upsertGeoJsonSource(map, SOURCE_MISSILE, withStringIds(missile));
+  ensureSelectionSource(map);
 
   // Per-(domain x faction) icon sprites must exist before unitDotLayer is
   // added; the layer's icon-image expression resolves to one of these ids.
   registerUnitIcons(map, scenario.factions);
+  registerMarkerIcons(map);
+  registerSelectionIcon(map);
 
   // Layer order: bottom -> top.
   addLayerOnce(map, contextFillLayer);
@@ -670,26 +937,75 @@ function addOrUpdateData(
   addLayerOnce(map, countryLineLayer);
   addLayerOnce(map, oblastFillLayer);
   addLayerOnce(map, oblastLineLayer);
+  addLayerOnce(map, missileFillLayer);
+  addLayerOnce(map, missileLineLayer);
   addLayerOnce(map, frontlineBufferLayer);
   addLayerOnce(map, supplyLineLayer);
   addLayerOnce(map, supplyDashLayer);
   addLayerOnce(map, frontlineLineLayer);
   addLayerOnce(map, oblastLabelLayer);
+  addLayerOnce(map, assetPlateLayer);
   addLayerOnce(map, assetDotLayer);
+  addLayerOnce(map, dockBadgePlateLayer);
+  addLayerOnce(map, dockBadgeTextLayer);
   addLayerOnce(map, assetLabelLayer);
   addLayerOnce(map, cityHaloLayer);
-  addLayerOnce(map, cityDotLayer);
+  addLayerOnce(map, cityPlateLayer);
+  addLayerOnce(map, cityIconLayer);
   addLayerOnce(map, cityLabelLayer);
   addLayerOnce(map, unitHaloLayer);
   addLayerOnce(map, unitDotLayer);
   addLayerOnce(map, unitGlyphLayer);
+  addLayerOnce(map, selectionReticleLayer);
 
   ensureMovementOverlay(map);
   refreshMovementOverlayData(map, useAppStore.getState().groundMoveDrafts, scenario.units);
+  ensureActionDraftOverlay(map);
+  refreshActionDraftOverlay(map, useAppStore.getState().actionDraft);
+  ensureStagedOrdersOverlay(map);
+  {
+    const st0 = useAppStore.getState();
+    const stagedNow = st0.stagedOrders[st0.playerTeam];
+    refreshStagedOrdersOverlay(map, stagedNow, scenario, {
+      suppress: st0.replay !== null,
+    });
+  }
+  ensureStrikeArcLayer(map);
+
+  const sel = useAppStore.getState().selection;
+  const overrides = useAppStore.getState().unitPositionOverrides;
+  const selSrc = map.getSource(SOURCE_SELECTION) as
+    | maplibregl.GeoJSONSource
+    | undefined;
+  if (selSrc) selSrc.setData(selectionFeatureCollection(scenario, sel, teamReticleColor(useAppStore.getState().playerTeam), overrides));
+
+  // Layer visibility is applied in a separate effect, but that effect can run
+  // before this function first adds layers (e.g. scenario before borders). New
+  // layers default to visible, so re-sync with the store whenever data layers
+  // are (re)built.
+  applyLayerVisibility(map, useAppStore.getState().visibleLayers);
 }
 
 function addLayerOnce(map: MlMap, spec: maplibregl.LayerSpecification) {
   if (!map.getLayer(spec.id)) map.addLayer(spec);
+}
+
+function teamReticleColor(team: import("@/state/playerTeam").PlayerTeam): string {
+  return team === "blue" ? "#5aa9ff" : "#ff5a5a";
+}
+
+/** Map-level unit filter combining FoW (per `team`) and docking. The
+ *  selection is forced visible so users can drill into an enemy unit via
+ *  the OOB tree even if it's not currently detected. */
+function filterUnitsForMap(
+  scenario: ScenarioSnapshot,
+  team: import("@/state/playerTeam").PlayerTeam,
+  selection: Selection,
+) {
+  const selectedUnitId = selection?.kind === "unit" ? selection.id : null;
+  const visible = computeVisibleUnitIds(scenario, team, selectedUnitId);
+  const docked = new Set(computeDocking(scenario).unitToAsset.keys());
+  return scenario.units.filter((u) => visible.has(u.id) && (!docked.has(u.id) || u.id === selectedUnitId));
 }
 
 function upsertGeoJsonSource(
@@ -717,6 +1033,15 @@ function withStringIds<G extends GeoJSON.Geometry, P extends { id: string }>(
     ...fc,
     features: fc.features.map((f) => ({ ...f, id: f.properties.id })),
   };
+}
+
+/** Snap tolerance in km, scaled to current zoom so candidate dots stay easy
+ *  to hit at any pitch. ~12 px at the current zoom. */
+function actionDraftSnapKm(map: MlMap): number {
+  const zoom = map.getZoom();
+  const metresPerPixel = (40075016 * Math.cos((map.getCenter().lat * Math.PI) / 180)) /
+    Math.pow(2, zoom + 8);
+  return (metresPerPixel * 18) / 1000;
 }
 
 function applyGroundMoveClick(unitId: string, click: [number, number]): void {
@@ -748,12 +1073,15 @@ function applyLayerVisibility(map: MlMap, vis: Record<LayerKey, boolean>) {
   set(LAYER_COUNTRY_CONTEXT_FILL, true);
   set(LAYER_COUNTRY_CONTEXT_LINE, true);
   set(LAYER_CITY_HALO, vis.cities);
-  set(LAYER_CITY_DOT, vis.cities);
+  set(LAYER_CITY_PLATE, vis.cities);
+  set(LAYER_CITY_ICON, vis.cities);
   set(LAYER_CITY_LABEL, vis.cities);
   set(LAYER_FRONTLINE_BUFFER, vis.frontline);
   set(LAYER_FRONTLINE_LINE, vis.frontline);
   set(LAYER_SUPPLY_LINE, vis.supply_lines);
   set(LAYER_SUPPLY_DASH, vis.supply_lines);
+  set(LAYER_MISSILE_FILL, vis.missile_ranges);
+  set(LAYER_MISSILE_LINE, vis.missile_ranges);
   set(LAYER_MOVEMENT_FILL, vis.units_ground);
   set(LAYER_MOVEMENT_RING, vis.units_ground);
   set(LAYER_MOVEMENT_ROUTE, vis.units_ground);
@@ -769,6 +1097,7 @@ function applyLayerVisibility(map: MlMap, vis: Record<LayerKey, boolean>) {
   };
   const anyAsset =
     vis.depots || vis.airfields || vis.naval_bases || vis.border_crossings;
+  set(LAYER_ASSET_PLATE, anyAsset);
   set(LAYER_ASSET_DOT, anyAsset);
   set(LAYER_ASSET_LABEL, anyAsset);
   // Empty `in` + `["literal", []]` breaks MapLibre symbol draw (null `.width`); skip setFilter when nothing is on.
@@ -781,6 +1110,7 @@ function applyLayerVisibility(map: MlMap, vis: Record<LayerKey, boolean>) {
       ["get", "kind"],
       ["literal", kinds],
     ] as maplibregl.FilterSpecification;
+    if (map.getLayer(LAYER_ASSET_PLATE)) map.setFilter(LAYER_ASSET_PLATE, assetFilter);
     if (map.getLayer(LAYER_ASSET_DOT)) map.setFilter(LAYER_ASSET_DOT, assetFilter);
     if (map.getLayer(LAYER_ASSET_LABEL)) map.setFilter(LAYER_ASSET_LABEL, assetFilter);
   }

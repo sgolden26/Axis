@@ -25,6 +25,14 @@ from axis.settings import (
     save_settings,
 )
 
+# Anchor default output paths to the repo root rather than the current working
+# directory. The CLI is routinely invoked from either the repo root or the
+# `backend/` subdir, and a cwd-relative default like `Path("../data/...")`
+# silently writes outside the project when invoked from anywhere else. Using
+# `__file__` keeps writes inside `Axis/data/` regardless of cwd.
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+_DATA_DIR = _PROJECT_ROOT / "data"
+
 app = typer.Typer(add_completion=False, help="Axis wargame backend CLI.")
 intel_app = typer.Typer(add_completion=False, help="Intel / morale pipeline.")
 morale_factors_app = typer.Typer(
@@ -59,13 +67,13 @@ def export(
         help="Scenario id to export.",
     ),
     out: Path = typer.Option(
-        Path("../data/state.json"),
+        _DATA_DIR / "state.json",
         "--out",
         "-o",
-        help="Output JSON path (relative to cwd).",
+        help="Output JSON path. Defaults to <repo>/data/state.json.",
     ),
     intel_out: Path = typer.Option(
-        Path("../data/intel.json"),
+        _DATA_DIR / "intel.json",
         "--intel-out",
         help="Where to write intel.json. Pass empty string to skip.",
     ),
@@ -160,10 +168,10 @@ def intel_export(
         help=_SOURCE_HELP,
     ),
     out: Path = typer.Option(
-        Path("../data/intel.json"),
+        _DATA_DIR / "intel.json",
         "--out",
         "-o",
-        help="Output intel.json path.",
+        help="Output intel.json path. Defaults to <repo>/data/intel.json.",
     ),
 ) -> None:
     """Run the intel pipeline once and write intel.json."""
@@ -188,10 +196,10 @@ def intel_tick(
         help=_SOURCE_HELP,
     ),
     out: Path = typer.Option(
-        Path("../data/intel.json"),
+        _DATA_DIR / "intel.json",
         "--out",
         "-o",
-        help="Output intel.json path.",
+        help="Output intel.json path. Defaults to <repo>/data/intel.json.",
     ),
     interval: float = typer.Option(
         30.0,
@@ -273,7 +281,7 @@ def intel_tick(
 @morale_factors_app.command("pull")
 def morale_factors_pull(
     out: Path = typer.Option(
-        Path("../data/morale_factors.json"),
+        _DATA_DIR / "morale_factors.json",
         "--out",
         "-o",
         help="Output morale_factors.json path.",

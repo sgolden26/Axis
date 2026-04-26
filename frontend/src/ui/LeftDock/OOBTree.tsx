@@ -65,27 +65,32 @@ export function OOBTree() {
 
   return (
     <div className="py-1">
-      <div className="px-3 py-1 font-mono text-[9px] uppercase tracking-wider2 text-ink-200">
-        order of battle · {scenario.units.length}
+      <div className="flex items-center justify-between px-3 pb-1 pt-2">
+        <span className="font-mono text-[9px] uppercase tracking-wider2 text-ink-300">
+          order of battle
+        </span>
+        <span className="font-mono text-[9px] tabular-nums text-ink-300">
+          {scenario.units.length}
+        </span>
       </div>
       {groups.map(({ faction, domains }) => {
         const factionKey = `f:${faction.id}`;
         const factionOpen = expanded[factionKey] ?? true;
         return (
-          <div key={faction.id} className="hairline-t">
+          <div key={faction.id} className="hairline-soft-b">
             <button
               onClick={() => toggle(factionKey)}
-              className="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-ink-700"
+              className="flex w-full items-center gap-2 px-3 py-1.5 transition-colors hover:bg-white/[0.02]"
             >
+              <span className="font-mono text-[9px] text-ink-300">
+                {factionOpen ? "▾" : "▸"}
+              </span>
               <span
-                className="inline-block h-2 w-2"
+                className="inline-block h-2 w-2 rounded-[1px]"
                 style={{ background: faction.color }}
               />
               <span className="flex-1 truncate text-left font-mono text-[10px] uppercase tracking-wider2 text-ink-50">
                 {faction.id}
-              </span>
-              <span className="font-mono text-[9px] text-ink-300">
-                {factionOpen ? "−" : "+"}
               </span>
             </button>
             {factionOpen &&
@@ -96,16 +101,19 @@ export function OOBTree() {
                   <div key={domain}>
                     <button
                       onClick={() => toggle(domainKey)}
-                      className="flex w-full items-center gap-2 pl-6 pr-3 py-1 hover:bg-ink-700"
+                      className="flex w-full items-center gap-2 py-1 pl-6 pr-3 transition-colors hover:bg-white/[0.02]"
                     >
+                      <span className="font-mono text-[9px] text-ink-300">
+                        {domainOpen ? "▾" : "▸"}
+                      </span>
                       <span className="font-mono text-[10px] text-ink-200">
                         {DOMAIN_GLYPH[domain]}
                       </span>
                       <span className="flex-1 truncate text-left font-mono text-[9px] uppercase tracking-wider2 text-ink-200">
-                        {DOMAIN_LABEL[domain]} · {units.length}
+                        {DOMAIN_LABEL[domain]}
                       </span>
-                      <span className="font-mono text-[9px] text-ink-300">
-                        {domainOpen ? "−" : "+"}
+                      <span className="font-mono text-[9px] tabular-nums text-ink-300">
+                        {units.length}
                       </span>
                     </button>
                     {domainOpen && (
@@ -117,10 +125,10 @@ export function OOBTree() {
                             <li key={u.id}>
                               <button
                                 onClick={() => select({ kind: "unit", id: u.id })}
-                                className={`flex w-full items-center gap-2 pl-10 pr-3 py-0.5 text-left font-mono text-[10px] tracking-wider2 transition-colors ${
+                                className={`flex w-full items-center gap-2 py-1 pl-10 pr-3 text-left font-mono text-[10px] tracking-wider2 transition-colors ${
                                   active
-                                    ? "bg-ink-700 text-ink-50"
-                                    : "text-ink-100 hover:bg-ink-700"
+                                    ? "row-selected text-ink-50"
+                                    : "text-ink-100 hover:bg-white/[0.02]"
                                 }`}
                               >
                                 <span className="truncate">
