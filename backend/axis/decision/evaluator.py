@@ -22,6 +22,13 @@ CONTRIBUTION_DIVISOR = 8.0
 P_FLOOR = 0.05
 P_CEIL = 0.95
 SIGNIFICANT_DELTA = 0.015
+# Group-level scalars applied at evaluation time. Intel-side contributions
+# (morale, trend, severity, category drivers) are dampened; political-side
+# contributions (pressure, credibility) are amplified, so political context
+# outweighs morale by roughly 3:1 in per-action max swing. The TS mirror in
+# `frontend/src/decision/evaluator.ts` MUST keep the same values.
+MORALE_SCALE = 1.0 / 3.0
+POLITICAL_SCALE = 3.0
 
 
 BreakdownKind = Literal["base", "modifier", "category"]
@@ -104,14 +111,14 @@ def evaluate(
     political: PoliticalContext | None = None,
 ) -> Outcome:
     morale_norm = (region.morale_score - 50.0) / 50.0
-    p_morale = morale_norm * action.morale_weight
+    p_morale = morale_norm * action.morale_weight * MORALE_SCALE
 
     trend_signed = _trend_signed(region.morale_trend)
-    p_trend = trend_signed * action.trend_weight
+    p_trend = trend_signed * action.trend_weight * MORALE_SCALE
 
     severity_sum = sum(d.contribution for d in region.drivers)
     severity_norm = _clamp(severity_sum / SEVERITY_DIVISOR, -1.0, 1.0)
-    p_severity = severity_norm * action.severity_weight
+    p_severity = severity_norm * action.severity_weight * MORALE_SCALE
 
     category_items: list[BreakdownItem] = []
     for d in region.drivers:
@@ -121,7 +128,7 @@ def evaluate(
         # Intensity is loudness (always non-negative); the catalog's signed
         # sensitivity decides whether this category helps or hurts the action.
         intensity = _clamp(abs(d.contribution) / CONTRIBUTION_DIVISOR, 0.0, 1.0)
-        delta = sensitivity * intensity
+        delta = sensitivity * intensity * MORALE_SCALE
         if abs(delta) < SIGNIFICANT_DELTA:
             continue
         category_items.append(
@@ -137,6 +144,8 @@ def evaluate(
 
     p_pressure, pressure_label = _pressure_delta(action, political)
     p_credibility, credibility_label = _credibility_delta(action, political)
+    p_pressure *= POLITICAL_SCALE
+    p_credibility *= POLITICAL_SCALE
 
     raw = (
         action.base_rate

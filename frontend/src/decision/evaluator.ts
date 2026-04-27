@@ -11,6 +11,13 @@ export const CONTRIBUTION_DIVISOR = 8.0;
 export const P_FLOOR = 0.05;
 export const P_CEIL = 0.95;
 export const SIGNIFICANT_DELTA = 0.015;
+// Group-level scalars applied at evaluation time. Intel-side contributions
+// (morale, trend, severity, category drivers) are dampened; political-side
+// contributions (pressure, credibility) are amplified, so political context
+// outweighs morale by roughly 3:1 in per-action max swing. The Python mirror
+// in `backend/axis/decision/evaluator.py` MUST keep the same values.
+export const MORALE_SCALE = 1 / 3;
+export const POLITICAL_SCALE = 3.0;
 
 const CATEGORY_PHRASE: Record<EventCategory, [negative: string, positive: string]> = {
   protest: ["protest activity", "protest activity"],
@@ -79,21 +86,21 @@ export function evaluate(
   political?: PoliticalContext,
 ): Outcome {
   const moraleNorm = (region.morale_score - 50) / 50;
-  const pMorale = moraleNorm * action.morale_weight;
+  const pMorale = moraleNorm * action.morale_weight * MORALE_SCALE;
 
   const tSigned = trendSigned(region.morale_trend);
-  const pTrend = tSigned * action.trend_weight;
+  const pTrend = tSigned * action.trend_weight * MORALE_SCALE;
 
   const severitySum = region.drivers.reduce((acc, d) => acc + d.contribution, 0);
   const severityNorm = clamp(severitySum / SEVERITY_DIVISOR, -1, 1);
-  const pSeverity = severityNorm * action.severity_weight;
+  const pSeverity = severityNorm * action.severity_weight * MORALE_SCALE;
 
   const categoryItems: BreakdownItem[] = [];
   for (const d of region.drivers) {
     const sensitivity = action.category_sensitivities[d.category] ?? 0;
     if (sensitivity === 0) continue;
     const intensity = clamp(Math.abs(d.contribution) / CONTRIBUTION_DIVISOR, 0, 1);
-    const delta = sensitivity * intensity;
+    const delta = sensitivity * intensity * MORALE_SCALE;
     if (Math.abs(delta) < SIGNIFICANT_DELTA) continue;
     categoryItems.push({
       label: categoryLabel(d.category, d.contribution),
@@ -106,11 +113,13 @@ export function evaluate(
 
   const pCategories = categoryItems.reduce((a, b) => a + b.delta, 0);
 
-  const { delta: pPressure, label: pressureLabel } = pressureDelta(action, political);
-  const { delta: pCredibility, label: credibilityLabel } = credibilityDelta(
+  const { delta: rawPressure, label: pressureLabel } = pressureDelta(action, political);
+  const { delta: rawCredibility, label: credibilityLabel } = credibilityDelta(
     action,
     political,
   );
+  const pPressure = rawPressure * POLITICAL_SCALE;
+  const pCredibility = rawCredibility * POLITICAL_SCALE;
 
   const raw =
     action.base_rate +
