@@ -16,6 +16,7 @@ import { DecisionImmersive } from "@/ui/DecisionEngine/DecisionImmersive";
 import { MoveLimitToast } from "@/ui/MoveLimitToast";
 import { OrdersCart } from "@/ui/Orders/OrdersCart";
 import { AssistantBar } from "@/ui/Assistant/AssistantBar";
+import { SpawnPulses } from "@/ui/Assistant/SpawnPulses";
 import { ArticleDrawer } from "@/ui/Article/ArticleDrawer";
 import { PhasePill } from "@/ui/Replay/PhasePill";
 import { DamageChips } from "@/ui/Replay/DamageChips";
@@ -66,6 +67,7 @@ export function App() {
         <main className="relative flex-1 overflow-hidden">
           <MapView />
           <DamageChips />
+          <SpawnPulses />
           <PhasePill />
           <OrdersCart />
           <AssistantBar />

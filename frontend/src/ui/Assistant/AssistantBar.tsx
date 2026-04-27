@@ -15,6 +15,7 @@ export function AssistantBar() {
   const warnings = useAppStore((s) => s.assistantWarnings);
   const error = useAppStore((s) => s.assistantError);
   const stagedCount = useAppStore((s) => s.assistantStagedCount);
+  const spawnedCount = useAppStore((s) => s.assistantSpawnedCount);
   const playerTeam = useAppStore((s) => s.playerTeam);
   const ready = useAppStore((s) => s.roundReady[s.playerTeam]);
   const executing = useAppStore((s) => s.executing);
@@ -62,12 +63,13 @@ export function AssistantBar() {
 
   return (
     <div className="pointer-events-none absolute bottom-24 left-1/2 z-[70] flex w-[min(720px,90vw)] -translate-x-1/2 flex-col items-stretch gap-2">
-      {(rationale || error || warnings.length > 0) && (
+      {(rationale || error || warnings.length > 0 || spawnedCount > 0) && (
         <RationaleStrip
           rationale={rationale}
           warnings={warnings}
           error={error}
           stagedCount={stagedCount}
+          spawnedCount={spawnedCount}
           onDismiss={dismiss}
         />
       )}
@@ -118,6 +120,7 @@ interface RationaleStripProps {
   warnings: string[];
   error: string | null;
   stagedCount: number;
+  spawnedCount: number;
   onDismiss: () => void;
 }
 
@@ -126,6 +129,7 @@ function RationaleStrip({
   warnings,
   error,
   stagedCount,
+  spawnedCount,
   onDismiss,
 }: RationaleStripProps) {
   return (
@@ -139,16 +143,28 @@ function RationaleStrip({
           )}
           {!error && rationale && (
             <>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="hairline border border-accent-ok bg-accent-ok/10 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-wider2 text-accent-ok">
                   AI plan
                 </span>
                 <span className="font-mono text-[9px] uppercase tracking-wider2 text-ink-200">
                   {stagedCount} order{stagedCount === 1 ? "" : "s"} staged
                 </span>
+                {spawnedCount > 0 && (
+                  <span className="hairline border border-accent-amber bg-accent-amber/10 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-wider2 text-accent-amber">
+                    deployed {spawnedCount} platform{spawnedCount === 1 ? "" : "s"}
+                  </span>
+                )}
               </div>
               <p className="text-[12px] leading-snug text-ink-50">{rationale}</p>
             </>
+          )}
+          {!error && !rationale && spawnedCount > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="hairline border border-accent-amber bg-accent-amber/10 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-wider2 text-accent-amber">
+                deployed {spawnedCount} platform{spawnedCount === 1 ? "" : "s"}
+              </span>
+            </div>
           )}
           {!error && !rationale && stagedCount === 0 && warnings.length > 0 && (
             <p className="font-mono text-[10px] uppercase tracking-wider2 text-accent-amber">

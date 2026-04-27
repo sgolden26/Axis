@@ -28,6 +28,7 @@ import {
 } from "@/state/orders";
 import type { OrderDTO } from "@/types/orders";
 import { suggestOrders } from "@/api/suggestOrders";
+import { loadScenario } from "@/api/loadScenario";
 import type {
   SortieMissionDTO,
   StrikeTargetKindDTO,
@@ -43,7 +44,10 @@ import {
   buildReplayEvents,
   type ReplayEvent,
   type ReplayPhase,
+  type ReplayEngageEvent,
+  type ReplayStrikeEvent,
 } from "@/state/replay";
+import { planStrikes } from "@/map/layers/strikeArcLayer";
 import { greatCircleInterpolate, haversineKm } from "@/map/geodesic";
 
 export type LayerKey =
@@ -179,6 +183,13 @@ interface AppState {
   assistantWarnings: string[];
   assistantError: string | null;
   assistantStagedCount: number;
+  /** Count of world edits applied by the most recent suggestion (e.g. SAM
+   *  batteries the LLM stood up). Drives the "Deployed N" line. */
+  assistantSpawnedCount: number;
+  /** Transient pulse markers for entities the LLM spawned this round.
+   *  The SpawnPulses overlay reads them, drops each entry once its CSS
+   *  animation expires (~2.5s after `at`). */
+  assistantSpawnPulses: SpawnPulse[];
 
   setScenario: (s: ScenarioSnapshot) => void;
   setLoadError: (e: string | null) => void;
@@ -274,6 +285,18 @@ interface AppState {
   submitAssistantPrompt: (prompt: string) => Promise<void>;
   /** Drop the in-place rationale strip and clear assistant warnings/errors. */
   dismissAssistant: () => void;
+  /** Drop the spawn pulse for `id` once its animation has finished playing. */
+  dismissSpawnPulse: (id: string) => void;
+}
+
+export interface SpawnPulse {
+  id: string;
+  kind: "missile_range" | "unit";
+  team: PlayerTeam;
+  name: string;
+  position: [number, number];
+  /** Wall-clock ms when the pulse was emitted, used to time the animation. */
+  at: number;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -340,6 +363,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   assistantWarnings: [],
   assistantError: null,
   assistantStagedCount: 0,
+  assistantSpawnedCount: 0,
+  assistantSpawnPulses: [],
 
   setScenario: (s) =>
     set((state) => ({
@@ -822,9 +847,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ replay: { phase: "moves", events } });
       await animateMoveOrders(allOrders, set, get);
 
-      // Phase 2: strikes (arcs + impact pulses are driven off `replay.phase`).
+      // Phase 2: strikes. Duration auto-fits the planned animation (stagger +
+      // longest arc + tail), so dense rounds get a longer phase without
+      // collapsing into one frame.
       set({ replay: { phase: "strikes", events } });
-      await waitPhase(STRIKE_PHASE_MS);
+      const kinetic = events.filter(
+        (e): e is ReplayStrikeEvent | ReplayEngageEvent =>
+          e.kind === "strike" || e.kind === "engage",
+      );
+      const strikeMs = kinetic.length === 0
+        ? STRIKE_PHASE_MIN_MS
+        : Math.max(STRIKE_PHASE_MIN_MS, planStrikes(kinetic).totalDurationMs);
+      await waitPhase(strikeMs);
 
       // Phase 3: reports. Persistent damage chips. Commit snapshot now so the
       // map reflects the post-round world; chips remain until user dismisses.
@@ -872,19 +906,43 @@ export const useAppStore = create<AppState>((set, get) => ({
       assistantWarnings: [],
       assistantRationale: null,
       assistantStagedCount: 0,
+      assistantSpawnedCount: 0,
     });
     try {
       const team = state.playerTeam;
       const res = await suggestOrders({ prompt: text, issuer_team: team });
+
+      // Edits mutated the live theatre; refresh the FE snapshot first so
+      // any LLM orders referencing the spawned ids resolve cleanly.
+      if (res.edits.length > 0) {
+        try {
+          const fresh = await loadScenario();
+          set({ scenario: fresh });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn("[assistant] failed to refresh scenario after edits", message);
+        }
+      }
+
       const { staged, rejected } = applyLlmSuggestionsToCart(res.orders, team, set, get);
       const warnings = [...res.warnings, ...rejected];
-      set({
+      const pulses = res.edits.map<SpawnPulse>((e) => ({
+        id: e.id,
+        kind: e.kind === "spawn_missile_range" ? "missile_range" : "unit",
+        team,
+        name: e.name,
+        position: [e.position[0], e.position[1]],
+        at: Date.now(),
+      }));
+      set((s) => ({
         assistantBusy: false,
         assistantRationale: res.rationale || null,
         assistantWarnings: warnings,
         assistantStagedCount: staged,
-        cartOpen: staged > 0,
-      });
+        assistantSpawnedCount: res.edits.length,
+        assistantSpawnPulses: [...s.assistantSpawnPulses, ...pulses],
+        cartOpen: staged > 0 || s.cartOpen,
+      }));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set({ assistantBusy: false, assistantError: message });
@@ -896,7 +954,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       assistantWarnings: [],
       assistantError: null,
       assistantStagedCount: 0,
+      assistantSpawnedCount: 0,
     }),
+  dismissSpawnPulse: (id) =>
+    set((s) => ({
+      assistantSpawnPulses: s.assistantSpawnPulses.filter((p) => p.id !== id),
+    })),
 
   intelByRegion: () => {
     const intel = get().intel;
@@ -908,7 +971,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 }));
 
 const MOVE_ANIMATION_MS = 2200;
-const STRIKE_PHASE_MS = 1800;
+/** Minimum strike phase even with zero kinetic events, so the pill is legible. */
+const STRIKE_PHASE_MIN_MS = 600;
 
 /** Phase-wait plumbing. Each `waitPhase(ms)` resolves either after `ms` or
  *  when `cancelPendingPhase` is called (Skip button). The move animator also

@@ -56,9 +56,22 @@ export default {
           "0%": { transform: "translateX(0)" },
           "100%": { transform: "translateX(-50%)" },
         },
+        spawnRing: {
+          "0%": { transform: "translate(-50%, -50%) scale(0.4)", opacity: "0.9" },
+          "70%": { opacity: "0.55" },
+          "100%": { transform: "translate(-50%, -50%) scale(2.6)", opacity: "0" },
+        },
+        spawnLabel: {
+          "0%": { opacity: "0", transform: "translate(8px, calc(-50% - 14px))" },
+          "20%": { opacity: "1", transform: "translate(8px, calc(-50% - 18px))" },
+          "80%": { opacity: "1", transform: "translate(8px, calc(-50% - 18px))" },
+          "100%": { opacity: "0", transform: "translate(8px, calc(-50% - 22px))" },
+        },
       },
       animation: {
         ticker: "ticker 60s linear infinite",
+        spawnRing: "spawnRing 2200ms ease-out forwards",
+        spawnLabel: "spawnLabel 2400ms ease-out forwards",
       },
     },
   },

@@ -6,8 +6,37 @@ import {
   type PlayerTeamDTO,
 } from "@/types/orders";
 
+/** A single applied LLM world edit. The discriminator is `kind`; the
+ *  remaining fields differ per kind. We keep the schema permissive on
+ *  unknown fields so backend additions don't break the FE. */
+export const worldEditSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("spawn_missile_range"),
+    id: z.string(),
+    faction_id: z.string(),
+    name: z.string(),
+    position: z.tuple([z.number(), z.number()]),
+    range_km: z.number(),
+    category: z.string(),
+    weapon: z.string(),
+  }),
+  z.object({
+    kind: z.literal("spawn_unit"),
+    id: z.string(),
+    faction_id: z.string(),
+    name: z.string(),
+    unit_kind: z.string(),
+    position: z.tuple([z.number(), z.number()]),
+    strength: z.number(),
+    readiness: z.number(),
+    morale: z.number(),
+  }),
+]);
+export type WorldEditDTO = z.infer<typeof worldEditSchema>;
+
 export const suggestionResponseSchema = z.object({
   orders: z.array(orderSchema).default([]),
+  edits: z.array(worldEditSchema).default([]),
   rationale: z.string().default(""),
   warnings: z.array(z.string()).default([]),
 });

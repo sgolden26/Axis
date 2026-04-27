@@ -117,7 +117,6 @@ import {
 } from "./layers/stagedOrdersOverlay";
 import {
   ensureStrikeArcLayer,
-  arcsFromReplayEvents,
   playStrikeAnimation,
   clearStrikeArcs,
 } from "./layers/strikeArcLayer";
@@ -517,14 +516,12 @@ export function MapView() {
         return;
       }
       if (replay.phase === "strikes") {
-        const arcs = arcsFromReplayEvents(
-          replay.events.filter(
-            (e): e is import("@/state/replay").ReplayStrikeEvent
-              | import("@/state/replay").ReplayEngageEvent =>
-              e.kind === "strike" || e.kind === "engage",
-          ),
+        const kineticEvents = replay.events.filter(
+          (e): e is import("@/state/replay").ReplayStrikeEvent
+            | import("@/state/replay").ReplayEngageEvent =>
+            e.kind === "strike" || e.kind === "engage",
         );
-        const stop = playStrikeAnimation(map, arcs, 1800);
+        const stop = playStrikeAnimation(map, kineticEvents);
         return () => stop();
       }
       // Reports phase keeps arcs cleared (chips are HTML-overlaid).

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type {
   Airfield,
   Aor,
@@ -9,9 +10,11 @@ import type {
   MissileRange,
   NavalBase,
   SupplyLine,
+  Unit,
 } from "@/types/scenario";
 import { useAppStore } from "@/state/store";
 import { isFactionControllableByPlayerTeam } from "@/state/playerTeam";
+import { computeDocking } from "@/state/visibility";
 import { SectionHeader } from "./primitives/SectionHeader";
 import { KeyValueRow } from "./primitives/KeyValueRow";
 import { FactionTag } from "./primitives/FactionTag";
@@ -128,6 +131,7 @@ export function AirfieldDetail({
       <Pos pos={airfield.position} />
       <KeyValueRow label="runway" value={`${airfield.runway_m.toLocaleString()} m`} />
       <KeyValueRow label="based aircraft" value={airfield.based_aircraft} />
+      <DockedUnits assetId={airfield.id} hostFaction={faction} />
       <ActionList actions={airfield.available_actions} />
     </div>
   );
@@ -161,8 +165,75 @@ export function NavalDetail({
           </ul>
         </>
       )}
+      <DockedUnits assetId={base.id} hostFaction={faction} />
       <ActionList actions={base.available_actions} />
     </div>
+  );
+}
+
+/** Lists units currently docked at the host asset (computed live from the
+ *  scenario via `computeDocking`). Each row selects the unit so its standard
+ *  `UnitDetail` panel surfaces with sortie / rebase / strike etc. Always
+ *  rendered: for friendly assets the user gets at-a-glance access to their
+ *  based aircraft / fleets; for enemy assets the same list doubles as a
+ *  target picker (the dock badge already exposes the count). */
+function DockedUnits({
+  assetId,
+  hostFaction,
+}: {
+  assetId: string;
+  hostFaction: Faction;
+}) {
+  const scenario = useAppStore((s) => s.scenario);
+  const select = useAppStore((s) => s.select);
+  const playerTeam = useAppStore((s) => s.playerTeam);
+  const docking = useMemo(
+    () => (scenario ? computeDocking(scenario) : null),
+    [scenario],
+  );
+  if (!scenario || !docking) return null;
+  const ids = docking.assetToUnits.get(assetId) ?? [];
+  if (ids.length === 0) return null;
+  const unitById = new Map(scenario.units.map((u) => [u.id, u]));
+  const factionsById = new Map(scenario.factions.map((f) => [f.id, f]));
+  const units: Unit[] = ids
+    .map((id) => unitById.get(id))
+    .filter((u): u is Unit => !!u);
+  const isHostile = !isFactionControllableByPlayerTeam(hostFaction, playerTeam)
+    && hostFaction.allegiance !== "neutral";
+
+  return (
+    <>
+      <SectionHeader
+        label="docked units"
+        trailing={isHostile ? `${units.length} · target` : `${units.length}`}
+      />
+      <ul className="space-y-1 px-3 py-2">
+        {units.map((u) => {
+          const f = factionsById.get(u.faction_id);
+          return (
+            <li key={u.id}>
+              <button
+                type="button"
+                onClick={() => select({ kind: "unit", id: u.id })}
+                className="hairline w-full rounded-sm border border-ink-500 bg-ink-700/40 px-2 py-1 text-left transition-colors hover:border-ink-300"
+              >
+                <div className="flex items-center gap-1.5">
+                  {f && <FactionTag faction={f} />}
+                  <span className="truncate font-mono text-[11px] uppercase tracking-wider2 text-ink-100">
+                    {u.name}
+                  </span>
+                </div>
+                <div className="mt-0.5 font-mono text-[9px] uppercase tracking-wider2 text-ink-300">
+                  {u.domain} · str {Math.round(u.strength * 100)}% · rd{" "}
+                  {Math.round(u.readiness * 100)}%
+                </div>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }
 
