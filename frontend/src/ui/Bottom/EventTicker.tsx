@@ -43,6 +43,12 @@ export function EventTicker({ thin = false }: { thin?: boolean }) {
     () => new Set((scenario?.territories ?? []).map((t) => t.id)),
     [scenario],
   );
+  const regionNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const o of scenario?.oblasts ?? []) map.set(o.id, o.name);
+    for (const t of scenario?.territories ?? []) map.set(t.id, t.name);
+    return map;
+  }, [scenario]);
 
   const onClickEvent = (ev: IntelEvent) => {
     if (oblastIds.has(ev.region_id)) select({ kind: "oblast", id: ev.region_id });
@@ -97,7 +103,9 @@ export function EventTicker({ thin = false }: { thin?: boolean }) {
               <span className={CATEGORY_TONE[ev.category]}>
                 {CATEGORY_GLYPH[ev.category]}
               </span>
-              <span className="text-ink-200">[{ev.region_id}]</span>
+              <span className="text-ink-200" title={ev.region_id}>
+                [{regionNameById.get(ev.region_id) ?? ev.region_id}]
+              </span>
               <span>{ev.headline}</span>
               <span className="text-ink-300">· {ev.source}</span>
             </button>

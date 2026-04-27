@@ -8,6 +8,7 @@ import { OutcomeCard } from "./OutcomeCard";
 import { RegionList } from "./RegionList";
 import { RegionSummary } from "./RegionSummary";
 import { DecisionStatusBadge } from "./DecisionStatusBadge";
+import { DecisionContextPanel } from "./DecisionContextPanel";
 import { resolveRegionEntity } from "@/decision/resolveRegionEntity";
 
 export function DecisionEngine() {
@@ -126,6 +127,16 @@ export function DecisionEngine() {
                 region={focusedRegion}
                 regionLabel={resolvedEntity.name}
                 faction={resolvedEntity.faction}
+              />
+            )}
+
+            {scenario && focusedRegion && resolvedEntity && (
+              <DecisionContextPanel
+                scenario={scenario}
+                playerTeam={playerTeam}
+                political={politicalContext ?? {}}
+                targetFaction={resolvedEntity.faction}
+                selectedAction={selectedAction}
               />
             )}
 

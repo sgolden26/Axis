@@ -113,12 +113,19 @@ class FactionPressure:
     `intensity` is treated as the derived rollup (regions + scenario deadline).
     Storing it explicitly lets the frontend read a stable per-tick value rather
     than recomputing.
+
+    `team_goal` follows the NATO Wargaming Handbook (HQ SACT, 2023) Fig. 7
+    convention of expressing time-bound team goals (e.g. "Keep your leader
+    alive until turn 5"). Stored as a verb phrase ending in its preposition
+    ("...by" / "...through"); the HUD appends the live `T-N` countdown so the
+    rendered string stays synced with `deadline_turn`.
     """
 
     faction_id: str
     intensity: float  # 0..1
     deadline_turn: int | None = None
     drivers: tuple[str, ...] = field(default_factory=tuple)
+    team_goal: str | None = None
 
     def __post_init__(self) -> None:
         _check_unit_interval("FactionPressure.intensity", self.intensity)

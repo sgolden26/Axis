@@ -43,6 +43,16 @@ class TheaterStore:
         with self._lock:
             return SnapshotExporter(self._theater).to_dict()
 
+    def with_theater(self, fn):
+        """Run `fn(theater)` under the read lock and return its result.
+
+        Used by callers (e.g. the explain endpoint) that need a coherent
+        read across multiple Theater fields without exposing the internal
+        lock or the mutable Theater instance.
+        """
+        with self._lock:
+            return fn(self._theater)
+
     def political_dict(self) -> dict[str, Any]:
         """Slice of the snapshot containing only the political layer.
 

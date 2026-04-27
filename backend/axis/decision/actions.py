@@ -33,6 +33,10 @@ class Action:
     #   actions take a smaller magnitude.
     pressure_aggression_bias: float = 0.0
     credibility_weight: float = 0.0
+    # One-sentence wargame-context note. Surfaced in the FE on action hover and
+    # echoed verbatim in the explain endpoint. Keep <= 140 chars and write for a
+    # non-technical reader.
+    wargame_note: str = ""
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -48,6 +52,7 @@ class Action:
             },
             "pressure_aggression_bias": self.pressure_aggression_bias,
             "credibility_weight": self.credibility_weight,
+            "wargame_note": self.wargame_note,
         }
 
 
@@ -69,6 +74,10 @@ DEFAULT_ACTIONS: tuple[Action, ...] = (
         },
         pressure_aggression_bias=0.18,
         credibility_weight=0.12,
+        wargame_note=(
+            "Signals commitment and shifts ground control, but locks units forward "
+            "and raises the cost of backing off."
+        ),
     ),
     Action(
         id="escalate_conflict",
@@ -87,6 +96,10 @@ DEFAULT_ACTIONS: tuple[Action, ...] = (
         },
         pressure_aggression_bias=0.25,
         credibility_weight=0.18,
+        wargame_note=(
+            "Authorises kinetic strikes; can break a stalemate but burns "
+            "credibility fast if you back off mid-campaign."
+        ),
     ),
     Action(
         id="impose_sanctions",
@@ -105,6 +118,10 @@ DEFAULT_ACTIONS: tuple[Action, ...] = (
         },
         pressure_aggression_bias=-0.10,
         credibility_weight=0.08,
+        wargame_note=(
+            "Non-kinetic pressure; slow but politically defensible to allied "
+            "audiences and hard for the target to reciprocate symmetrically."
+        ),
     ),
     Action(
         id="conduct_surveillance",
@@ -123,6 +140,10 @@ DEFAULT_ACTIONS: tuple[Action, ...] = (
         },
         pressure_aggression_bias=-0.05,
         credibility_weight=0.02,
+        wargame_note=(
+            "Hard-to-refuse ISR uplift; preserves options without committing "
+            "forces, but rarely changes the situation on its own."
+        ),
     ),
 )
 

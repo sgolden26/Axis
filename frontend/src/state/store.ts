@@ -79,7 +79,7 @@ export const ALL_LAYERS: LayerKey[] = [
   "frontline",
 ];
 
-export type RightTab = "context" | "decision";
+export type RightTab = "prompt" | "context" | "decision";
 
 export interface HoverPayload {
   kind: SelectableKind;

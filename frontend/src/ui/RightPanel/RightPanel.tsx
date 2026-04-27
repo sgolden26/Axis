@@ -1,8 +1,10 @@
 import { useAppStore, type RightTab } from "@/state/store";
 import { Sidebar } from "@/ui/Sidebar/Sidebar";
 import { DecisionEngine } from "@/ui/DecisionEngine/DecisionEngine";
+import { PromptPanel } from "@/ui/Prompt/PromptPanel";
 
 const TABS: { id: RightTab; label: string }[] = [
+  { id: "prompt", label: "prompt" },
   { id: "context", label: "context" },
   { id: "decision", label: "decision" },
 ];
@@ -60,7 +62,13 @@ export function RightPanel() {
         </button>
       </div>
       <div className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
-        {tab === "context" ? <Sidebar /> : <DecisionEngine />}
+        {tab === "prompt" ? (
+          <PromptPanel />
+        ) : tab === "context" ? (
+          <Sidebar />
+        ) : (
+          <DecisionEngine />
+        )}
       </div>
     </aside>
   );

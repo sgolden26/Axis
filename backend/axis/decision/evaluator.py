@@ -32,13 +32,20 @@ class BreakdownItem:
     label: str
     kind: BreakdownKind
     delta: float  # contribution to probability, signed
+    # Stable identifier the explain endpoint uses to attach a payload to a
+    # specific row. Examples: "base", "morale", "trend", "severity",
+    # "cat:protest", "pressure", "credibility". Optional for legacy callers.
+    key: str = ""
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        d: dict[str, object] = {
             "label": self.label,
             "kind": self.kind,
             "delta": round(self.delta, 4),
         }
+        if self.key:
+            d["key"] = self.key
+        return d
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +129,7 @@ def evaluate(
                 label=_category_label(d.category, d.contribution),
                 kind="category",
                 delta=delta,
+                key=f"cat:{d.category.value}",
             )
         )
 
@@ -142,8 +150,15 @@ def evaluate(
     probability = _clamp(raw, P_FLOOR, P_CEIL)
 
     breakdown: list[BreakdownItem] = [
-        BreakdownItem(label="base rate", kind="base", delta=action.base_rate),
-        BreakdownItem(label=_morale_label(morale_norm), kind="modifier", delta=p_morale),
+        BreakdownItem(
+            label="base rate", kind="base", delta=action.base_rate, key="base"
+        ),
+        BreakdownItem(
+            label=_morale_label(morale_norm),
+            kind="modifier",
+            delta=p_morale,
+            key="morale",
+        ),
     ]
     if abs(p_trend) >= SIGNIFICANT_DELTA:
         breakdown.append(
@@ -151,6 +166,7 @@ def evaluate(
                 label=f"{region.morale_trend} trend",
                 kind="modifier",
                 delta=p_trend,
+                key="trend",
             )
         )
     if abs(p_severity) >= SIGNIFICANT_DELTA:
@@ -159,16 +175,27 @@ def evaluate(
                 label="recent event severity",
                 kind="modifier",
                 delta=p_severity,
+                key="severity",
             )
         )
     breakdown.extend(category_items)
     if abs(p_pressure) >= SIGNIFICANT_DELTA and pressure_label:
         breakdown.append(
-            BreakdownItem(label=pressure_label, kind="modifier", delta=p_pressure)
+            BreakdownItem(
+                label=pressure_label,
+                kind="modifier",
+                delta=p_pressure,
+                key="pressure",
+            )
         )
     if abs(p_credibility) >= SIGNIFICANT_DELTA and credibility_label:
         breakdown.append(
-            BreakdownItem(label=credibility_label, kind="modifier", delta=p_credibility)
+            BreakdownItem(
+                label=credibility_label,
+                kind="modifier",
+                delta=p_credibility,
+                key="credibility",
+            )
         )
 
     explanation = _build_explanation(

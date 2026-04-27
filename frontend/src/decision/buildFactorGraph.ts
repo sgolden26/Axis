@@ -50,9 +50,9 @@ export function buildFactorGraph(
     label: e.headline,
     sublabel: e.source,
     x: 20,
-    y: 32 + i * 72,
-    w: 200,
-    h: 58,
+    y: 24 + i * 88,
+    w: 220,
+    h: 76,
   }));
 
   const factorNodes: FlowNode[] = factors.map((d, i) => ({
@@ -61,10 +61,10 @@ export function buildFactorGraph(
     label: d.headline,
     sublabel: d.category,
     contribution: d.contribution,
-    x: 256,
-    y: 28 + i * 64,
-    w: 220,
-    h: 52,
+    x: 272,
+    y: 24 + i * 76,
+    w: 232,
+    h: 68,
   }));
 
   const morale: FlowNode = {
@@ -73,7 +73,7 @@ export function buildFactorGraph(
     label: "Regional morale",
     sublabel: territoryName,
     weightHint: region.morale_score / 100,
-    x: 510,
+    x: 524,
     y: 88,
     w: 160,
     h: 120,
